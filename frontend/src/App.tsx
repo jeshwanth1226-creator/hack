@@ -44,8 +44,6 @@ export default function App() {
   const [state, setState] = useState<CorridorState>(DEFAULT_STATE);
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
-
-  // Role Routing via URL query: ?role=ambulance or ?role=hq (default)
   const [role, setRole] = useState<"hq" | "ambulance">("hq");
 
   useEffect(() => {
@@ -59,33 +57,52 @@ export default function App() {
         ? "ws://127.0.0.1:8765"
         : "wss://traffic-backend-4e61.onrender.com";
 
-    let ws: WebSocket;
-    try {
-      ws = new WebSocket(WS_URL);
-      wsRef.current = ws;
+    let reconnectTimer: NodeJS.Timeout;
 
-      ws.onopen = () => setConnected(true);
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === "STATE_UPDATE" && msg.data) {
-            setState((prev) => ({
-              ...prev,
-              ...msg.data,
-              severity: msg.data.severity || prev.severity || "CRITICAL (CODE RED)",
-            }));
+    function connect() {
+      try {
+        const ws = new WebSocket(WS_URL);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+          console.log("WebSocket connected to cloud backend");
+          setConnected(true);
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === "STATE_UPDATE" && msg.data) {
+              setState((prev) => ({
+                ...prev,
+                ...msg.data,
+                severity: msg.data.severity || prev.severity || "CRITICAL (CODE RED)",
+              }));
+            }
+          } catch (e) {
+            console.error(e);
           }
-        } catch (e) {
-          console.error(e);
-        }
-      };
-      ws.onclose = () => setConnected(false);
-      ws.onerror = () => setConnected(false);
-    } catch {
-      setConnected(false);
+        };
+
+        ws.onclose = () => {
+          setConnected(false);
+          reconnectTimer = setTimeout(connect, 3000);
+        };
+
+        ws.onerror = () => {
+          setConnected(false);
+          ws.close();
+        };
+      } catch (err) {
+        setConnected(false);
+        reconnectTimer = setTimeout(connect, 3000);
+      }
     }
 
+    connect();
+
     return () => {
+      clearTimeout(reconnectTimer);
       if (wsRef.current) wsRef.current.close();
     };
   }, []);
@@ -129,7 +146,7 @@ export default function App() {
             Switch to {role === "hq" ? "🚑 Ambulance App" : "🚨 HQ App"}
           </button>
           <span style={{ padding: "6px 12px", borderRadius: "999px", fontSize: "0.75rem", fontWeight: "bold", backgroundColor: connected ? "#064e3b" : "#450a0a", color: connected ? "#34d399" : "#fca5a5" }}>
-            {connected ? "● CLOUD SYNCED" : "○ DISCONNECTED"}
+            {connected ? "● CLOUD SYNCED" : "○ CONNECTING / WAKING UP..."}
           </span>
         </div>
       </header>
