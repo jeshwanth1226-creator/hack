@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import "./App.css";
 
 interface Signal {
@@ -16,6 +16,7 @@ interface CorridorState {
   route_name: string;
   eta_seconds: number;
   distance_km: number;
+  severity?: string;
   signals: Signal[];
   alert: string;
 }
@@ -29,6 +30,7 @@ const DEFAULT_STATE: CorridorState = {
   route_name: "Primary Corridor (Route A)",
   eta_seconds: 180,
   distance_km: 2.4,
+  severity: "NONE",
   signals: [
     { id: 1, name: "Intersection 1 - MG Road", status: "RED" },
     { id: 2, name: "Intersection 2 - Central Ave", status: "RED" },
@@ -54,7 +56,11 @@ export default function App() {
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === "STATE_UPDATE" && msg.data) {
-            setState(msg.data);
+            setState((prev) => ({
+              ...prev,
+              ...msg.data,
+              severity: msg.data.severity || prev.severity || "CRITICAL (CODE RED)",
+            }));
           }
         } catch (e) {
           console.error(e);
@@ -71,15 +77,25 @@ export default function App() {
     };
   }, []);
 
-  const handleAction = (action: string) => {
+  const handleAction = (action: string, severityChoice?: string) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ action }));
+      wsRef.current.send(JSON.stringify({ action, severity: severityChoice }));
     }
 
     setState((prev) => {
       let next = { ...prev };
+
       if (action === "TRIGGER_EMERGENCY") {
         next.emergency_active = true;
+        next.severity = severityChoice || "CRITICAL (CODE RED)";
+
+        if (next.severity.includes("ROUTINE")) {
+          next.police_decision = "NORMAL FLOW (NO PREEMPTION)";
+          next.alert = "ROUTINE TRANSPORT - STANDARD TRAFFIC SIGNALS MAINTAINED";
+          next.signals = next.signals.map((s) => ({ ...s, status: "RED" }));
+          return next;
+        }
+
         if (!next.police_available) {
           next.police_decision = "AUTO_APPROVED";
           next.signals = next.road_blocked
@@ -94,10 +110,10 @@ export default function App() {
                 { id: 3, name: "Intersection 3 - Park Street", status: "PREPARING" },
                 { id: 4, name: "Intersection 4 - Hospital Link", status: "RED" },
               ];
-          next.alert = "AUTOMATIC GREEN-WAVE FAILOVER ENGAGED";
+          next.alert = `AUTOMATIC FAILOVER ENGAGED FOR ${next.severity}`;
         } else {
           next.police_decision = "PENDING";
-          next.alert = "EMERGENCY VEHICLE DETECTED - AWAITING POLICE APPROVAL";
+          next.alert = `EMERGENCY ALERT [${next.severity}] - AWAITING POLICE APPROVAL`;
         }
       } else if (action === "POLICE_APPROVE") {
         if (next.emergency_active) {
@@ -114,13 +130,21 @@ export default function App() {
                 { id: 3, name: "Intersection 3 - Park Street", status: "PREPARING" },
                 { id: 4, name: "Intersection 4 - Hospital Link", status: "RED" },
               ];
-          next.alert = "GREEN-WAVE ACTIVE - CORRIDOR SYNCHRONIZED";
+          next.alert = `GREEN-WAVE CLEARED FOR ${next.severity || "CRITICAL"}`;
         }
       } else if (action === "POLICE_REJECT") {
         if (next.emergency_active) {
-          next.police_decision = "REJECTED";
-          next.signals = next.signals.map((s) => ({ ...s, status: "RED" }));
-          next.alert = "GREEN WAVE REJECTED BY POLICE OPERATOR";
+          next.police_decision = "REJECTED (REROUTING SUGGESTED)";
+          next.road_blocked = true;
+          next.route_name = "Alternative Bypass (Route B)";
+          next.eta_seconds = 240;
+          next.distance_km = 3.1;
+          next.signals = [
+            { id: 1, name: "Intersection 1 - MG Road", status: "RED" },
+            { id: 5, name: "Intersection 5 - Ring Road Bypass", status: "RED" },
+            { id: 4, name: "Intersection 4 - Hospital Link", status: "RED" },
+          ];
+          next.alert = "PRIMARY ROUTE REJECTED - DETOUR SUGGESTED TO ROUTE B";
         }
       } else if (action === "TOGGLE_ROAD_BLOCK") {
         next.road_blocked = !next.road_blocked;
@@ -154,7 +178,7 @@ export default function App() {
         next.police_available = !next.police_available;
         if (!next.police_available && next.emergency_active && next.police_decision === "PENDING") {
           next.police_decision = "AUTO_APPROVED";
-          next.alert = "OPERATOR OFFLINE - SYSTEM ENGAGED AUTO FAILOVER";
+          next.alert = `OPERATOR OFFLINE - AUTO FAILOVER ACTIVATED FOR ${next.severity || "CRITICAL"}`;
           next.signals = [
             { id: 1, name: "Intersection 1 - MG Road", status: "GREEN" },
             { id: 2, name: "Intersection 2 - Central Ave", status: "GREEN" },
@@ -168,6 +192,16 @@ export default function App() {
       return next;
     });
   };
+
+  const getSeverityBadgeColor = () => {
+    const sev = state.severity || "NONE";
+    if (sev.includes("CRITICAL")) return { bg: "#450a0a", text: "#f87171", border: "#dc2626" };
+    if (sev.includes("URGENT")) return { bg: "#451a03", text: "#fbbf24", border: "#d97706" };
+    if (sev.includes("ROUTINE")) return { bg: "#064e3b", text: "#34d399", border: "#059669" };
+    return { bg: "#1e293b", text: "#94a3b8", border: "#334155" };
+  };
+
+  const badgeStyle = getSeverityBadgeColor();
 
   return (
     <div style={{ padding: "24px", fontFamily: "system-ui, sans-serif", backgroundColor: "#0b0f19", color: "#f1f5f9", minHeight: "100vh" }}>
@@ -187,27 +221,31 @@ export default function App() {
       </header>
 
       {/* Notification Banner */}
-      <div style={{ marginTop: "18px", padding: "14px", borderRadius: "8px", fontWeight: "bold", textAlign: "center", backgroundColor: state.emergency_active ? (state.police_decision === "REJECTED" ? "#450a0a" : "#064e3b") : "#1e293b", border: "1px solid #334155", color: "#f8fafc" }}>
+      <div style={{ marginTop: "18px", padding: "14px", borderRadius: "8px", fontWeight: "bold", textAlign: "center", backgroundColor: state.emergency_active ? (state.police_decision.includes("REJECTED") ? "#450a0a" : "#064e3b") : "#1e293b", border: "1px solid #334155", color: "#f8fafc" }}>
         SYSTEM NOTIFICATION: {state.alert}
       </div>
 
       {/* Telemetry Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px", marginTop: "18px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "14px", marginTop: "18px" }}>
         <div style={{ backgroundColor: "#111827", padding: "16px", borderRadius: "8px", border: "1px solid #1e293b" }}>
           <div style={{ fontSize: "0.75rem", color: "#94a3b8", textTransform: "uppercase" }}>Ambulance Location</div>
-          <div style={{ fontSize: "1.1rem", fontWeight: "bold", marginTop: "6px" }}>{state.ambulance_location}</div>
+          <div style={{ fontSize: "1.05rem", fontWeight: "bold", marginTop: "6px" }}>{state.ambulance_location}</div>
+        </div>
+        <div style={{ backgroundColor: "#111827", padding: "16px", borderRadius: "8px", border: `1px solid ${badgeStyle.border}` }}>
+          <div style={{ fontSize: "0.75rem", color: "#94a3b8", textTransform: "uppercase" }}>Patient Triage Code</div>
+          <div style={{ fontSize: "1.05rem", fontWeight: "bold", marginTop: "6px", color: badgeStyle.text }}>{state.severity || "NONE"}</div>
         </div>
         <div style={{ backgroundColor: "#111827", padding: "16px", borderRadius: "8px", border: "1px solid #1e293b" }}>
           <div style={{ fontSize: "0.75rem", color: "#94a3b8", textTransform: "uppercase" }}>ETA & Distance</div>
-          <div style={{ fontSize: "1.1rem", fontWeight: "bold", marginTop: "6px", color: "#38bdf8" }}>{state.eta_seconds}s ({state.distance_km} km)</div>
+          <div style={{ fontSize: "1.05rem", fontWeight: "bold", marginTop: "6px", color: "#38bdf8" }}>{state.eta_seconds}s ({state.distance_km} km)</div>
         </div>
         <div style={{ backgroundColor: "#111827", padding: "16px", borderRadius: "8px", border: "1px solid #1e293b" }}>
           <div style={{ fontSize: "0.75rem", color: "#94a3b8", textTransform: "uppercase" }}>Current Route</div>
-          <div style={{ fontSize: "1.1rem", fontWeight: "bold", marginTop: "6px", color: "#f59e0b" }}>{state.route_name}</div>
+          <div style={{ fontSize: "1.05rem", fontWeight: "bold", marginTop: "6px", color: "#f59e0b" }}>{state.route_name}</div>
         </div>
         <div style={{ backgroundColor: "#111827", padding: "16px", borderRadius: "8px", border: "1px solid #1e293b" }}>
           <div style={{ fontSize: "0.75rem", color: "#94a3b8", textTransform: "uppercase" }}>Emergency Decision</div>
-          <div style={{ fontSize: "1.1rem", fontWeight: "bold", marginTop: "6px", color: state.police_decision === "APPROVED" || state.police_decision === "AUTO_APPROVED" ? "#4ade80" : state.police_decision === "REJECTED" ? "#f87171" : "#fbbf24" }}>{state.police_decision}</div>
+          <div style={{ fontSize: "1.05rem", fontWeight: "bold", marginTop: "6px", color: state.police_decision === "APPROVED" || state.police_decision === "AUTO_APPROVED" ? "#4ade80" : state.police_decision.includes("REJECTED") ? "#f87171" : "#fbbf24" }}>{state.police_decision}</div>
         </div>
       </div>
 
@@ -226,7 +264,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* Main Dispatch Action Buttons */}
+      {/* Dispatch Action Buttons */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginTop: "18px" }}>
         <button onClick={() => handleAction("POLICE_APPROVE")} style={{ padding: "14px", backgroundColor: "#059669", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}>
           [ APPROVE GREEN WAVE ]
@@ -236,13 +274,27 @@ export default function App() {
         </button>
       </div>
 
-      {/* Simulator Control Bar */}
+      {/* Simulator Bar */}
       <div style={{ marginTop: "18px", backgroundColor: "#111827", padding: "16px", borderRadius: "8px", border: "1px solid #1e293b" }}>
-        <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginBottom: "12px", textTransform: "uppercase", fontWeight: "bold" }}>Hackathon Simulation Controls</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-          <button onClick={() => handleAction("TRIGGER_EMERGENCY")} style={{ padding: "8px 14px", backgroundColor: "#1e293b", border: "1px solid #3b82f6", color: "#60a5fa", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>
-            🚑 Trigger Emergency Call
+        <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginBottom: "12px", textTransform: "uppercase", fontWeight: "bold" }}>
+          🚑 Ambulance Driver Dispatch Options (Patient Triage Severity)
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "14px" }}>
+          <button onClick={() => handleAction("TRIGGER_EMERGENCY", "CRITICAL (CODE RED)")} style={{ padding: "8px 14px", backgroundColor: "#450a0a", border: "1px solid #ef4444", color: "#fca5a5", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>
+            🔴 Call: Critical (Code Red)
           </button>
+          <button onClick={() => handleAction("TRIGGER_EMERGENCY", "URGENT (CODE YELLOW)")} style={{ padding: "8px 14px", backgroundColor: "#451a03", border: "1px solid #f59e0b", color: "#fde68a", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>
+            🟡 Call: Urgent (Code Yellow)
+          </button>
+          <button onClick={() => handleAction("TRIGGER_EMERGENCY", "ROUTINE (CODE GREEN)")} style={{ padding: "8px 14px", backgroundColor: "#064e3b", border: "1px solid #10b981", color: "#a7f3d0", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>
+            🟢 Call: Routine (Code Green)
+          </button>
+        </div>
+
+        <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginBottom: "10px", textTransform: "uppercase", fontWeight: "bold" }}>
+          Grid & Operator Environment Overrides
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
           <button onClick={() => handleAction("TOGGLE_ROAD_BLOCK")} style={{ padding: "8px 14px", backgroundColor: "#1e293b", border: "1px solid #f59e0b", color: "#fbbf24", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>
             🚧 Block / Reroute Corridor
           </button>
