@@ -25,7 +25,7 @@ STATE = {
 async def broadcast_state():
     if CLIENTS:
         message = json.dumps({"type": "STATE_UPDATE", "data": STATE})
-        await asyncio.gather(*[client.send(message) for client in CLIENTS])
+        await asyncio.gather(*[client.send(message) for client in CLIENTS if not client.closed])
 
 def recalculate_corridor():
     if not STATE["emergency_active"]:
@@ -64,8 +64,8 @@ def recalculate_corridor():
 
 async def handler(websocket):
     CLIENTS.add(websocket)
-    await websocket.send(json.dumps({"type": "STATE_UPDATE", "data": STATE}))
     try:
+        await websocket.send(json.dumps({"type": "STATE_UPDATE", "data": STATE}))
         async for message in websocket:
             data = json.loads(message)
             action = data.get("action")
@@ -73,7 +73,10 @@ async def handler(websocket):
             if action == "TRIGGER_EMERGENCY":
                 STATE["emergency_active"] = True
                 STATE["police_decision"] = "AUTO_APPROVED" if not STATE["police_available"] else "PENDING"
-                recalculate_corridor()
+                if STATE["police_decision"] == "AUTO_APPROVED":
+                    recalculate_corridor()
+                else:
+                    STATE["alert"] = "EMERGENCY VEHICLE DETECTED - AWAITING POLICE APPROVAL"
 
             elif action == "POLICE_APPROVE":
                 if STATE["emergency_active"]:
@@ -85,26 +88,40 @@ async def handler(websocket):
                     STATE["police_decision"] = "REJECTED"
                     recalculate_corridor()
 
-            elif action == "TRIGGER_ROADBLOCK":
-                STATE["road_blocked"] = data.get("value", True)
-                recalculate_corridor()
+            elif action == "TOGGLE_ROAD_BLOCK":
+                STATE["road_blocked"] = not STATE["road_blocked"]
+                if STATE["emergency_active"] and STATE["police_decision"] in ["APPROVED", "AUTO_APPROVED"]:
+                    recalculate_corridor()
 
-            elif action == "TOGGLE_POLICE_AVAILABILITY":
-                STATE["police_available"] = data.get("value", True)
+            elif action == "TOGGLE_OPERATOR":
+                STATE["police_available"] = not STATE["police_available"]
+                if STATE["emergency_active"] and not STATE["police_available"] and STATE["police_decision"] == "PENDING":
+                    STATE["police_decision"] = "AUTO_APPROVED"
+                    recalculate_corridor()
 
-            elif action == "CANCEL_EMERGENCY":
+            elif action == "RESET_NORMAL":
                 STATE["emergency_active"] = False
-                STATE["road_blocked"] = False
                 STATE["police_decision"] = "PENDING"
+                STATE["road_blocked"] = False
+                STATE["ambulance_location"] = "7th Cross, MG Road"
+                STATE["route_name"] = "Primary Corridor (Route A)"
+                STATE["eta_seconds"] = 180
+                STATE["distance_km"] = 2.4
+                STATE["signals"] = [
+                    {"id": 1, "name": "Intersection 1 - MG Road", "status": "RED"},
+                    {"id": 2, "name": "Intersection 2 - Central Ave", "status": "RED"},
+                    {"id": 3, "name": "Intersection 3 - Park Street", "status": "RED"},
+                    {"id": 4, "name": "Intersection 4 - Hospital Link", "status": "RED"},
+                ]
                 recalculate_corridor()
 
             await broadcast_state()
     finally:
-        CLIENTS.remove(websocket)
+        CLIENTS.discard(websocket)
 
 async def main():
-    print("Traffic Police WebSocket Server running on ws://localhost:8765")
-    async with websockets.serve(handler, "localhost", 8765):
+    print("Traffic Police WebSocket Server running on ws://127.0.0.1:8765")
+    async with websockets.serve(handler, "0.0.0.0", 8765):
         await asyncio.Future()
 
 if __name__ == "__main__":
