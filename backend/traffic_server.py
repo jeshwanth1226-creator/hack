@@ -1,8 +1,19 @@
-﻿import asyncio
+﻿import os
 import json
-import os
-import websockets
-from http import HTTPStatus
+from typing import Set
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 STATE = {
     "emergency_active": False,
@@ -23,19 +34,40 @@ STATE = {
     "alert": "NORMAL OPERATIONS - SYSTEM READY"
 }
 
-CONNECTED = set()
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Set[WebSocket] = set()
 
-async def broadcast_state():
-    if CONNECTED:
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.add(websocket)
+        await websocket.send_text(json.dumps({"type": "STATE_UPDATE", "data": STATE}))
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.discard(websocket)
+
+    async def broadcast(self):
         msg = json.dumps({"type": "STATE_UPDATE", "data": STATE})
-        await asyncio.gather(*[client.send(msg) for client in list(CONNECTED)])
+        for connection in list(self.active_connections):
+            try:
+                await connection.send_text(msg)
+            except Exception:
+                self.active_connections.discard(connection)
 
-async def handler(websocket):
-    CONNECTED.add(websocket)
+manager = ConnectionManager()
+
+@app.get("/")
+async def health_check():
+    return PlainTextResponse("Traffic Server Live")
+
+@app.websocket("/ws")
+@app.websocket("/")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
     try:
-        await websocket.send(json.dumps({"type": "STATE_UPDATE", "data": STATE}))
-        async for message in websocket:
-            req = json.loads(message)
+        while True:
+            data = await websocket.receive_text()
+            req = json.loads(data)
             action = req.get("action")
             sev = req.get("severity")
 
@@ -128,21 +160,13 @@ async def handler(websocket):
                     "alert": "NORMAL OPERATIONS - SYSTEM READY"
                 })
 
-            await broadcast_state()
-    finally:
-        CONNECTED.discard(websocket)
-
-async def process_request(path, request_headers):
-    # Standard HTTP health check for Render port validation
-    if "Upgrade" not in request_headers or request_headers.get("Upgrade").lower() != "websocket":
-        return HTTPStatus.OK, [("Content-Type", "text/plain")], b"Server Active\n"
-    return None
-
-async def main():
-    port = int(os.environ.get("PORT", 8765))
-    print(f"Starting server on 0.0.0.0:{port}")
-    async with websockets.serve(handler, "0.0.0.0", port, process_request=process_request):
-        await asyncio.Future()
+            await manager.broadcast()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception:
+        manager.disconnect(websocket)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import uvicorn
+    port = int(os.environ.get("PORT", 8765))
+    uvicorn.run(app, host="0.0.0.0", port=port)
