@@ -2,6 +2,7 @@
 import json
 import os
 import websockets
+from http import HTTPStatus
 
 STATE = {
     "emergency_active": False,
@@ -27,12 +28,12 @@ CONNECTED = set()
 async def broadcast_state():
     if CONNECTED:
         msg = json.dumps({"type": "STATE_UPDATE", "data": STATE})
-        await asyncio.gather(*[client.send(msg) for client in CONNECTED])
+        await asyncio.gather(*[client.send(msg) for client in list(CONNECTED)])
 
 async def handler(websocket):
     CONNECTED.add(websocket)
-    await websocket.send(json.dumps({"type": "STATE_UPDATE", "data": STATE}))
     try:
+        await websocket.send(json.dumps({"type": "STATE_UPDATE", "data": STATE}))
         async for message in websocket:
             req = json.loads(message)
             action = req.get("action")
@@ -129,11 +130,18 @@ async def handler(websocket):
 
             await broadcast_state()
     finally:
-        CONNECTED.remove(websocket)
+        CONNECTED.discard(websocket)
+
+async def process_request(path, request_headers):
+    # Standard HTTP health check for Render port validation
+    if "Upgrade" not in request_headers or request_headers.get("Upgrade").lower() != "websocket":
+        return HTTPStatus.OK, [("Content-Type", "text/plain")], b"Server Active\n"
+    return None
 
 async def main():
     port = int(os.environ.get("PORT", 8765))
-    async with websockets.serve(handler, "0.0.0.0", port):
+    print(f"Starting server on 0.0.0.0:{port}")
+    async with websockets.serve(handler, "0.0.0.0", port, process_request=process_request):
         await asyncio.Future()
 
 if __name__ == "__main__":
