@@ -55,7 +55,7 @@ export default function App() {
     const WS_URL =
       window.location.hostname === "localhost"
         ? "ws://127.0.0.1:8765/ws"
-        : "wss://traffic-backend-4e01.onrender.com/ws";
+        : "wss://traffic-backend-4e0l.onrender.com/ws";
 
     let reconnectTimer: ReturnType<typeof setTimeout>;
 
@@ -156,7 +156,7 @@ export default function App() {
         STATUS: {state.alert}
       </div>
 
-      {/* Ambulance Layout */}
+      {/* Ambulance View */}
       {role === "ambulance" ? (
         <div style={{ marginTop: "20px" }}>
           <div style={{ backgroundColor: "#111827", padding: "18px", borderRadius: "8px", border: "1px solid #1e293b", marginBottom: "16px" }}>
@@ -196,7 +196,7 @@ export default function App() {
           </div>
         </div>
       ) : (
-        /* HQ Operator Layout */
+        /* HQ Operator View */
         <div style={{ marginTop: "16px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
             <div style={{ backgroundColor: "#111827", padding: "14px", borderRadius: "8px", border: "1px solid #1e293b" }}>
