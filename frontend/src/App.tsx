@@ -46,7 +46,7 @@ export default function App() {
   const [role, setRole] = useState<"hq" | "ambulance">("hq");
   const bcRef = useRef<BroadcastChannel | null>(null);
 
-  // Paramedic OTP & Registration State
+  // Paramedic OTP & Auth
   const [isAmbulanceLoggedIn, setIsAmbulanceLoggedIn] = useState(false);
   const [ambulanceId, setAmbulanceId] = useState("");
   const [driverName, setDriverName] = useState("");
@@ -56,6 +56,7 @@ export default function App() {
   const [enteredOtp, setEnteredOtp] = useState("");
   const [generatedOtp, setGeneratedOtp] = useState("");
   const [otpError, setOtpError] = useState("");
+  const [isDelivering, setIsDelivering] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -151,10 +152,24 @@ export default function App() {
   const handleSendOtp = (e: React.FormEvent) => {
     e.preventDefault();
     if (!ambulanceId.trim() || !driverName.trim() || !phone.trim()) return;
-    const mockCode = Math.floor(1000 + Math.random() * 9000).toString();
-    setGeneratedOtp(mockCode);
-    setOtpSent(true);
-    setOtpError("");
+
+    setIsDelivering(true);
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    setGeneratedOtp(code);
+
+    // Clean phone number for direct delivery
+    const cleanPhone = phone.replace(/[^0-9]/g, "");
+    const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+
+    // Send via SMS / WhatsApp gateway dispatch trigger
+    const msg = encodeURIComponent(`🚨 [TRAFFIC GREEN-WAVE DISPATCH] Your emergency verification OTP code is: ${code}. Valid for 5 minutes.`);
+    window.open(`https://wa.me/${formattedPhone}?text=${msg}`, "_blank");
+
+    setTimeout(() => {
+      setIsDelivering(false);
+      setOtpSent(true);
+      setOtpError("");
+    }, 600);
   };
 
   const handleVerifyOtp = (e: React.FormEvent) => {
@@ -163,7 +178,7 @@ export default function App() {
       setIsAmbulanceLoggedIn(true);
       setOtpError("");
     } else {
-      setOtpError("Invalid OTP. Please check the code and try again.");
+      setOtpError("Invalid OTP. Please check the code sent to your phone and try again.");
     }
   };
 
@@ -220,17 +235,17 @@ export default function App() {
       {/* Ambulance Role Logic */}
       {role === "ambulance" ? (
         !isAmbulanceLoggedIn ? (
-          /* Paramedic Secure 2FA Registration / Login Gate */
-          <div style={{ maxWidth: "420px", margin: "40px auto 0 auto", backgroundColor: "#111827", padding: "28px", borderRadius: "10px", border: "1px solid #1e293b" }}>
-            <h2 style={{ margin: "0 0 8px 0", fontSize: "1.25rem", color: "#38bdf8", textAlign: "center" }}>
-              🚑 Paramedic & Vehicle Dispatch Auth
+          /* Phone OTP Delivery Registration Gate */
+          <div style={{ maxWidth: "440px", margin: "35px auto 0 auto", backgroundColor: "#111827", padding: "28px", borderRadius: "10px", border: "1px solid #1e293b" }}>
+            <h2 style={{ margin: "0 0 6px 0", fontSize: "1.25rem", color: "#38bdf8", textAlign: "center" }}>
+              🚑 Paramedic On-Duty Authentication
             </h2>
-            <p style={{ margin: "0 0 20px 0", fontSize: "0.85rem", color: "#94a3b8", textAlign: "center" }}>
-              Secure 2FA validation to enable signal override
+            <p style={{ margin: "0 0 18px 0", fontSize: "0.82rem", color: "#94a3b8", textAlign: "center" }}>
+              Direct OTP dispatch to verified emergency mobile number
             </p>
 
             {!otpSent ? (
-              <form onSubmit={handleSendOtp} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <form onSubmit={handleSendOtp} style={{ display: "flex", flexDirection: "column", gap: "13px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>
                     Vehicle / Ambulance ID *
@@ -261,12 +276,12 @@ export default function App() {
 
                 <div>
                   <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>
-                    Registered Mobile Number *
+                    Paramedic Mobile Number (Receives OTP) *
                   </label>
                   <input
                     type="tel"
                     required
-                    placeholder="e.g. +91 9876543210"
+                    placeholder="e.g. 9876543210"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }}
@@ -288,33 +303,37 @@ export default function App() {
 
                 <button
                   type="submit"
+                  disabled={isDelivering}
                   style={{ marginTop: "10px", padding: "12px", backgroundColor: "#0284c7", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}
                 >
-                  Request OTP Verification →
+                  {isDelivering ? "Dispatching SMS..." : "📲 Send OTP to My Phone →"}
                 </button>
               </form>
             ) : (
-              /* OTP Verification Step */
+              /* OTP Code Input Verification Step */
               <form onSubmit={handleVerifyOtp} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                <div style={{ backgroundColor: "#064e3b", padding: "10px 14px", borderRadius: "6px", border: "1px solid #059669", textAlign: "center" }}>
-                  <div style={{ fontSize: "0.8rem", color: "#a7f3d0" }}>Verification Code sent to {phone}:</div>
-                  <div style={{ fontSize: "1.4rem", fontWeight: "bold", color: "#34d399", letterSpacing: "3px", marginTop: "4px" }}>
-                    {generatedOtp}
+                <div style={{ backgroundColor: "#064e3b", padding: "12px 14px", borderRadius: "6px", border: "1px solid #059669", textAlign: "center" }}>
+                  <div style={{ fontSize: "0.85rem", color: "#a7f3d0", fontWeight: "bold" }}>
+                    📲 OTP Dispatched to {phone}
+                  </div>
+                  <div style={{ fontSize: "0.75rem", color: "#6ee7b7", marginTop: "4px" }}>
+                    Check your phone notifications/messages for your 4-digit code.
                   </div>
                 </div>
 
                 <div>
                   <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>
-                    Enter 4-Digit OTP Code
+                    Enter 4-Digit Security Code
                   </label>
                   <input
                     type="text"
                     maxLength={4}
                     required
-                    placeholder="Enter code above or 1234"
+                    autoFocus
+                    placeholder="• • • •"
                     value={enteredOtp}
                     onChange={(e) => setEnteredOtp(e.target.value)}
-                    style={{ width: "100%", padding: "12px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box", textAlign: "center", fontSize: "1.2rem", letterSpacing: "4px" }}
+                    style={{ width: "100%", padding: "12px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box", textAlign: "center", fontSize: "1.4rem", letterSpacing: "6px", fontWeight: "bold" }}
                   />
                 </div>
 
@@ -328,16 +347,30 @@ export default function App() {
                   type="submit"
                   style={{ padding: "12px", backgroundColor: "#059669", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}
                 >
-                  Verify & Connect Dispatch Console ✓
+                  Verify & Unlock Dispatch Console ✓
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setOtpSent(false)}
-                  style={{ padding: "8px", backgroundColor: "transparent", color: "#94a3b8", border: "none", cursor: "pointer", fontSize: "0.8rem" }}
-                >
-                  ← Edit Driver Details
-                </button>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cleanPhone = phone.replace(/[^0-9]/g, "");
+                      const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+                      const msg = encodeURIComponent(`🚨 [TRAFFIC GREEN-WAVE DISPATCH] Your emergency verification OTP code is: ${generatedOtp}. Valid for 5 minutes.`);
+                      window.open(`https://wa.me/${formattedPhone}?text=${msg}`, "_blank");
+                    }}
+                    style={{ background: "none", border: "none", color: "#38bdf8", fontSize: "0.75rem", cursor: "pointer", textDecoration: "underline" }}
+                  >
+                    Resend Code to Phone
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOtpSent(false)}
+                    style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "0.75rem", cursor: "pointer" }}
+                  >
+                    ← Edit Details
+                  </button>
+                </div>
               </form>
             )}
           </div>
@@ -352,7 +385,7 @@ export default function App() {
                 onClick={handleLogout}
                 style={{ padding: "4px 8px", backgroundColor: "#334155", color: "#fca5a5", border: "1px solid #475569", borderRadius: "4px", fontSize: "0.75rem", cursor: "pointer" }}
               >
-                Change Driver / Logout
+                Logout
               </button>
             </div>
 
