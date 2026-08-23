@@ -1,8 +1,8 @@
-﻿from fastapi import FastAPI
+﻿from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any, List
 
-app = FastAPI(title="Traffic Corridor API")
+app = FastAPI(title="Traffic Corridor API", docs_url="/docs", redoc_url="/redoc")
 
 app.add_middleware(
     CORSMiddleware,
@@ -12,7 +12,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Active Corridor State
 corridor_state = {
     "emergency_active": False,
     "police_available": True,
@@ -32,12 +31,15 @@ corridor_state = {
     "alert": "NORMAL OPERATIONS - SYSTEM READY",
 }
 
-# User Logins In-Memory List
 login_sessions: List[Dict[str, Any]] = []
 
-@app.get("/")
-def read_root():
-    return {"status": "online", "system": "Green Corridor Engine"}
+@app.api_route("/", methods=["GET", "HEAD"])
+def root():
+    return {"status": "online", "system": "Green Corridor Optimization Engine"}
+
+@app.api_route("/health", methods=["GET", "HEAD"])
+def health():
+    return {"status": "healthy"}
 
 @app.get("/status")
 def get_status():
