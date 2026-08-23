@@ -48,13 +48,13 @@ export default function App() {
   const [role, setRole] = useState<"hq" | "ambulance">("hq");
   const bcRef = useRef<BroadcastChannel | null>(null);
 
-  // Ambulance Auth State
+  // Ambulance Sign-in State
   const [isAmbulanceLoggedIn, setIsAmbulanceLoggedIn] = useState(false);
   const [ambulanceId, setAmbulanceId] = useState("");
   const [driverName, setDriverName] = useState("");
   const [hospitalName, setHospitalName] = useState("");
 
-  // HQ Police Auth State
+  // HQ Officer Sign-in State
   const [isHqLoggedIn, setIsHqLoggedIn] = useState(false);
   const [officerBadge, setOfficerBadge] = useState("");
   const [officerName, setOfficerName] = useState("");
@@ -76,8 +76,11 @@ export default function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const r = params.get("role");
-    if (r === "ambulance") setRole("ambulance");
-    else setRole("hq");
+    if (r === "ambulance") {
+      setRole("ambulance");
+    } else {
+      setRole("hq");
+    }
 
     fetchBackendState();
     const interval = setInterval(fetchBackendState, 3000);
@@ -200,14 +203,14 @@ export default function App() {
 
   return (
     <div style={{ padding: "20px", fontFamily: "system-ui, sans-serif", backgroundColor: "#0b0f19", color: "#f1f5f9", minHeight: "100vh" }}>
-      {/* Top Bar */}
+      {/* Top Header */}
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1e293b", paddingBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
         <div>
           <h1 style={{ margin: 0, fontSize: "1.5rem", color: "#38bdf8" }}>
             {role === "hq" ? "🚨 TRAFFIC POLICE COMMAND HQ" : "🚑 AMBULANCE ON-BOARD DISPATCH"}
           </h1>
           <p style={{ margin: "4px 0 0 0", color: "#94a3b8", fontSize: "0.85rem" }}>
-            {role === "hq" ? "Central Intersection Override & Green Wave" : "Emergency Priority Broadcast & Route Fast Track"}
+            {role === "hq" ? "Central Intersection Override & Green Wave Command" : "Emergency Priority Broadcast & Route Fast Track"}
           </p>
         </div>
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -226,12 +229,12 @@ export default function App() {
         </div>
       </header>
 
-      {/* Corridor Status Bar */}
+      {/* Corridor Status Alert */}
       <div style={{ marginTop: "14px", padding: "12px", borderRadius: "8px", fontWeight: "bold", textAlign: "center", backgroundColor: state.emergency_active ? (state.police_decision.includes("REJECTED") ? "#450a0a" : "#064e3b") : "#1e293b", border: "1px solid #334155", color: "#f8fafc" }}>
         STATUS: {state.alert}
       </div>
 
-      {/* AMBULANCE ROLE */}
+      {/* --- AMBULANCE VIEW --- */}
       {role === "ambulance" && (
         !isAmbulanceLoggedIn ? (
           <div style={{ maxWidth: "400px", margin: "40px auto 0 auto", backgroundColor: "#111827", padding: "28px", borderRadius: "10px", border: "1px solid #1e293b" }}>
@@ -239,7 +242,7 @@ export default function App() {
               🚑 Ambulance Driver Sign In
             </h2>
             <p style={{ margin: "0 0 20px 0", fontSize: "0.85rem", color: "#94a3b8", textAlign: "center" }}>
-              Sign in to initiate emergency corridor dispatch
+              Enter vehicle credentials to begin emergency dispatch
             </p>
 
             <form onSubmit={handleAmbulanceLogin} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
@@ -250,7 +253,7 @@ export default function App() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. AMB-108-HYD"
+                  placeholder="e.g. AMB-108"
                   value={ambulanceId}
                   onChange={(e) => setAmbulanceId(e.target.value)}
                   style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }}
@@ -259,7 +262,7 @@ export default function App() {
 
               <div>
                 <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>
-                  Paramedic / Driver Name *
+                  Driver Name *
                 </label>
                 <input
                   type="text"
@@ -273,11 +276,11 @@ export default function App() {
 
               <div>
                 <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>
-                  Base Hospital / Center
+                  Hospital / Base Center
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Apollo / City Hospital"
+                  placeholder="e.g. Apollo Hospital"
                   value={hospitalName}
                   onChange={(e) => setHospitalName(e.target.value)}
                   style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }}
@@ -345,7 +348,7 @@ export default function App() {
         )
       )}
 
-      {/* HQ POLICE ROLE */}
+      {/* --- TRAFFIC POLICE HQ VIEW --- */}
       {role === "hq" && (
         !isHqLoggedIn ? (
           <div style={{ maxWidth: "400px", margin: "40px auto 0 auto", backgroundColor: "#111827", padding: "28px", borderRadius: "10px", border: "1px solid #1e293b" }}>
@@ -391,7 +394,7 @@ export default function App() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Central Traffic Control Zone 1"
+                  placeholder="e.g. Central Traffic Command Sector 1"
                   value={commandZone}
                   onChange={(e) => setCommandZone(e.target.value)}
                   style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }}
