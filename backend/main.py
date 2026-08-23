@@ -36,7 +36,11 @@ login_sessions: List[Dict[str, Any]] = []
 @app.get("/")
 @app.head("/")
 def root():
-    return {"status": "online", "system": "Green Corridor Engine"}
+    return {"status": "online", "system": "Green Corridor Optimization Engine"}
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
 
 @app.get("/status")
 def get_status():
