@@ -177,17 +177,51 @@ export default function App() {
     }
   }, [state]);
 
-  const handleAmbulanceLogin = (e: React.FormEvent) => {
+  const handleAmbulanceLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (ambulanceId.trim() && driverName.trim()) {
       setIsAmbulanceLoggedIn(true);
+
+      // Record login session in Render backend
+      try {
+        await fetch(`${BACKEND_URL}/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role: "ambulance",
+            vehicle_id: ambulanceId,
+            driver_name: driverName,
+            hospital: hospitalName,
+            login_time: new Date().toISOString(),
+          }),
+        });
+      } catch (err) {
+        console.warn("Login sync notice:", err);
+      }
     }
   };
 
-  const handleHqLogin = (e: React.FormEvent) => {
+  const handleHqLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (officerBadge.trim() && officerName.trim()) {
       setIsHqLoggedIn(true);
+
+      // Record login session in Render backend
+      try {
+        await fetch(`${BACKEND_URL}/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role: "traffic_police_hq",
+            officer_badge: officerBadge,
+            officer_name: officerName,
+            sector: commandZone,
+            login_time: new Date().toISOString(),
+          }),
+        });
+      } catch (err) {
+        console.warn("Login sync notice:", err);
+      }
     }
   };
 
