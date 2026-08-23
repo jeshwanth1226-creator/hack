@@ -66,3 +66,80 @@ def update_action(payload: Dict[str, Any]):
     if "state" in payload:
         corridor_state = payload["state"]
     return {"status": "success", "updated_state": corridor_state}
+
+from fastapi.responses import HTMLResponse
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def get_dashboard_view():
+    data_list = []
+    for var_name in ['active_users', 'users', 'users_db', 'active_sessions', 'sessions']:
+        if var_name in globals() and isinstance(globals()[var_name], list):
+            data_list = globals()[var_name]
+            break
+            
+    rows = ""
+    for u in data_list:
+        role = u.get('role', 'AMBULANCE')
+        veh = u.get('vehicle_id') or u.get('vehicle_no') or 'N/A'
+        drv = u.get('driver_name') or u.get('driver_id') or 'N/A'
+        hosp = u.get('hospital', 'CITY GENERAL')
+        time = u.get('login_time', 'JUST NOW')
+        
+        rows += f"""
+        <tr class="border-b border-slate-700 hover:bg-slate-800/40">
+            <td class="px-6 py-4 font-bold text-emerald-400 uppercase">{role}</td>
+            <td class="px-6 py-4 font-mono text-cyan-300 font-semibold">{veh}</td>
+            <td class="px-6 py-4 text-slate-200">{drv}</td>
+            <td class="px-6 py-4 text-amber-300">{hosp}</td>
+            <td class="px-6 py-4 text-slate-400 text-xs font-mono">{time}</td>
+            <td class="px-6 py-4"><span class="px-2.5 py-1 text-xs rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-medium">ACTIVE</span></td>
+        </tr>
+        """
+    if not rows:
+        rows = '<tr><td colspan="6" class="text-center py-10 text-slate-500 font-medium">No active emergency corridor sessions.</td></tr>'
+
+    return f"""<!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="refresh" content="3">
+        <title>Green Wave Corridor | Live Registry</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-slate-950 text-slate-100 min-h-screen p-8 font-sans">
+        <div class="max-w-6xl mx-auto space-y-6">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
+                        Green Wave Corridor | Live Registry
+                    </h1>
+                    <p class="text-slate-400 text-sm mt-1">Real-time Emergency Vehicle & Traffic Signal Sync</p>
+                </div>
+                <div class="text-right">
+                    <span class="inline-flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-md bg-slate-900 border border-slate-800 text-slate-300">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                        Auto-refreshing (3s)
+                    </span>
+                    <p class="text-xs text-slate-500 mt-1">Active Units: <strong class="text-emerald-400">{len(data_list)}</strong></p>
+                </div>
+            </div>
+            <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/70 shadow-2xl">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-800/90 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-700">
+                        <tr>
+                            <th class="px-6 py-4">Role</th>
+                            <th class="px-6 py-4">Vehicle ID</th>
+                            <th class="px-6 py-4">Driver / Officer</th>
+                            <th class="px-6 py-4">Hospital</th>
+                            <th class="px-6 py-4">Login Time</th>
+                            <th class="px-6 py-4">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y border-slate-800">
+                        {rows}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+    </html>"""
