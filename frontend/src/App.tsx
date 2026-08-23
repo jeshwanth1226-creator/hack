@@ -45,7 +45,7 @@ const DEFAULT_STATE: CorridorState = {
 export default function App() {
   const [state, setState] = useState<CorridorState>(DEFAULT_STATE);
   const [connected, setConnected] = useState(false);
-  const [role, setRole] = useState<"hq" | "ambulance">("hq");
+  const [role, setRole] = useState<"" | "hq" | "ambulance">("");
   const bcRef = useRef<BroadcastChannel | null>(null);
 
   // Ambulance Sign-in State
@@ -78,8 +78,10 @@ export default function App() {
     const r = params.get("role");
     if (r === "ambulance") {
       setRole("ambulance");
-    } else {
+    } else if (r === "hq") {
       setRole("hq");
+    } else {
+      setRole(""); // Landing selection page
     }
 
     fetchBackendState();
@@ -181,8 +183,6 @@ export default function App() {
     e.preventDefault();
     if (ambulanceId.trim() && driverName.trim()) {
       setIsAmbulanceLoggedIn(true);
-
-      // Record login session in Render backend
       try {
         await fetch(`${BACKEND_URL}/login`, {
           method: "POST",
@@ -205,8 +205,6 @@ export default function App() {
     e.preventDefault();
     if (officerBadge.trim() && officerName.trim()) {
       setIsHqLoggedIn(true);
-
-      // Record login session in Render backend
       try {
         await fetch(`${BACKEND_URL}/login`, {
           method: "POST",
@@ -237,281 +235,203 @@ export default function App() {
 
   return (
     <div style={{ padding: "20px", fontFamily: "system-ui, sans-serif", backgroundColor: "#0b0f19", color: "#f1f5f9", minHeight: "100vh" }}>
-      {/* Top Header */}
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1e293b", paddingBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: "1.5rem", color: "#38bdf8" }}>
-            {role === "hq" ? "🚨 TRAFFIC POLICE COMMAND HQ" : "🚑 AMBULANCE ON-BOARD DISPATCH"}
-          </h1>
-          <p style={{ margin: "4px 0 0 0", color: "#94a3b8", fontSize: "0.85rem" }}>
-            {role === "hq" ? "Central Intersection Override & Green Wave Command" : "Emergency Priority Broadcast & Route Fast Track"}
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <button
-            onClick={() => {
-              const nextRole = role === "hq" ? "ambulance" : "hq";
-              window.location.search = `?role=${nextRole}`;
-            }}
-            style={{ padding: "6px 12px", borderRadius: "6px", backgroundColor: "#334155", color: "#f8fafc", border: "1px solid #475569", cursor: "pointer", fontSize: "0.8rem", fontWeight: "bold" }}
-          >
-            Switch to {role === "hq" ? "🚑 Ambulance App" : "🚨 HQ App"}
-          </button>
-          <span style={{ padding: "6px 12px", borderRadius: "999px", fontSize: "0.75rem", fontWeight: "bold", backgroundColor: connected ? "#064e3b" : "#450a0a", color: connected ? "#34d399" : "#fca5a5" }}>
-            {connected ? "● LIVE CLOUD SYNC" : "○ DISCONNECTED"}
-          </span>
-        </div>
-      </header>
+      
+      {/* LANDING PORTAL SELECTOR */}
+      {role === "" && (
+        <div style={{ maxWidth: "500px", margin: "60px auto", textAlign: "center" }}>
+          <h1 style={{ color: "#38bdf8", fontSize: "2rem", marginBottom: "10px" }}>🚨 GREEN WAVE CORRIDOR</h1>
+          <p style={{ color: "#94a3b8", marginBottom: "30px" }}>Emergency Priority & Traffic Signal Synchronization System</p>
 
-      {/* Corridor Status Alert */}
-      <div style={{ marginTop: "14px", padding: "12px", borderRadius: "8px", fontWeight: "bold", textAlign: "center", backgroundColor: state.emergency_active ? (state.police_decision.includes("REJECTED") ? "#450a0a" : "#064e3b") : "#1e293b", border: "1px solid #334155", color: "#f8fafc" }}>
-        STATUS: {state.alert}
-      </div>
-
-      {/* --- AMBULANCE VIEW --- */}
-      {role === "ambulance" && (
-        !isAmbulanceLoggedIn ? (
-          <div style={{ maxWidth: "400px", margin: "40px auto 0 auto", backgroundColor: "#111827", padding: "28px", borderRadius: "10px", border: "1px solid #1e293b" }}>
-            <h2 style={{ margin: "0 0 6px 0", fontSize: "1.3rem", color: "#38bdf8", textAlign: "center" }}>
-              🚑 Ambulance Driver Sign In
-            </h2>
-            <p style={{ margin: "0 0 20px 0", fontSize: "0.85rem", color: "#94a3b8", textAlign: "center" }}>
-              Enter vehicle credentials to begin emergency dispatch
-            </p>
-
-            <form onSubmit={handleAmbulanceLogin} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <button
+              onClick={() => {
+                window.location.search = "?role=ambulance";
+              }}
+              style={{ padding: "20px", backgroundColor: "#0284c7", color: "#fff", border: "none", borderRadius: "10px", fontSize: "1.2rem", fontWeight: "bold", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: "15px" }}
+            >
+              <span style={{ fontSize: "2rem" }}>🚑</span>
               <div>
-                <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>
-                  Vehicle / Ambulance ID *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. AMB-108"
-                  value={ambulanceId}
-                  onChange={(e) => setAmbulanceId(e.target.value)}
-                  style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }}
-                />
+                <div>Ambulance Driver Portal</div>
+                <div style={{ fontSize: "0.85rem", fontWeight: "normal", color: "#bae6fd" }}>Sign in to trigger emergency green corridor requests</div>
               </div>
+            </button>
 
+            <button
+              onClick={() => {
+                window.location.search = "?role=hq";
+              }}
+              style={{ padding: "20px", backgroundColor: "#15803d", color: "#fff", border: "none", borderRadius: "10px", fontSize: "1.2rem", fontWeight: "bold", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: "15px" }}
+            >
+              <span style={{ fontSize: "2rem" }}>🚨</span>
               <div>
-                <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>
-                  Driver Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Jeshwanth"
-                  value={driverName}
-                  onChange={(e) => setDriverName(e.target.value)}
-                  style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }}
-                />
+                <div>Traffic Police HQ Portal</div>
+                <div style={{ fontSize: "0.85rem", fontWeight: "normal", color: "#bbf7d0" }}>Sign in to manage intersection signals and overrides</div>
               </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>
-                  Hospital / Base Center
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Apollo Hospital"
-                  value={hospitalName}
-                  onChange={(e) => setHospitalName(e.target.value)}
-                  style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }}
-                />
-              </div>
-
-              <button
-                type="submit"
-                style={{ marginTop: "10px", padding: "12px", backgroundColor: "#0284c7", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}
-              >
-                Access Dispatch Console →
-              </button>
-            </form>
+            </button>
           </div>
-        ) : (
-          <div style={{ marginTop: "20px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", padding: "8px 12px", backgroundColor: "#1e293b", borderRadius: "6px" }}>
-              <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
-                Active Vehicle: <strong style={{ color: "#38bdf8" }}>{ambulanceId}</strong> | Driver: <strong style={{ color: "#f8fafc" }}>{driverName}</strong> {hospitalName && `(${hospitalName})`}
-              </div>
-              <button
-                onClick={() => setIsAmbulanceLoggedIn(false)}
-                style={{ padding: "4px 8px", backgroundColor: "#334155", color: "#fca5a5", border: "1px solid #475569", borderRadius: "4px", fontSize: "0.75rem", cursor: "pointer" }}
-              >
-                Logout
-              </button>
-            </div>
-
-            <div style={{ backgroundColor: "#111827", padding: "18px", borderRadius: "8px", border: "1px solid #1e293b", marginBottom: "16px" }}>
-              <h3 style={{ margin: "0 0 12px 0", color: "#38bdf8", fontSize: "1.1rem" }}>📍 LIVE NAVIGATION</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                <div style={{ backgroundColor: "#1f2937", padding: "12px", borderRadius: "6px" }}>
-                  <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>CURRENT CORRIDOR</div>
-                  <div style={{ fontSize: "1.1rem", fontWeight: "bold", color: "#fbbf24" }}>{state.route_name}</div>
-                </div>
-                <div style={{ backgroundColor: "#1f2937", padding: "12px", borderRadius: "6px" }}>
-                  <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>ETA / DISTANCE</div>
-                  <div style={{ fontSize: "1.1rem", fontWeight: "bold", color: "#38bdf8" }}>{state.eta_seconds}s ({state.distance_km} km)</div>
-                </div>
-              </div>
-              <div style={{ marginTop: "12px", padding: "10px", backgroundColor: "#1f2937", borderRadius: "6px", textAlign: "center" }}>
-                <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>HQ CLEARANCE STATUS: </span>
-                <strong style={{ color: state.police_decision === "APPROVED" || state.police_decision === "AUTO_APPROVED" ? "#4ade80" : "#f87171" }}>
-                  {state.police_decision}
-                </strong>
-              </div>
-            </div>
-
-            <h3 style={{ color: "#e2e8f0", fontSize: "1rem", marginBottom: "10px" }}>SELECT PATIENT EMERGENCY SEVERITY:</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <button onClick={() => handleAction("TRIGGER_EMERGENCY", "CRITICAL (CODE RED)")} style={{ padding: "18px", backgroundColor: "#dc2626", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "1.1rem", cursor: "pointer" }}>
-                🔴 CODE RED: CRITICAL (CARDIAC / TRAUMA)
-              </button>
-              <button onClick={() => handleAction("TRIGGER_EMERGENCY", "URGENT (CODE YELLOW)")} style={{ padding: "16px", backgroundColor: "#d97706", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}>
-                🟡 CODE YELLOW: URGENT (STABLE / MONITORING)
-              </button>
-              <button onClick={() => handleAction("TRIGGER_EMERGENCY", "ROUTINE (CODE GREEN)")} style={{ padding: "14px", backgroundColor: "#059669", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "0.95rem", cursor: "pointer" }}>
-                🟢 CODE GREEN: ROUTINE TRANSFER (NO OVERRIDE)
-              </button>
-              <button onClick={() => handleAction("RESET_NORMAL")} style={{ padding: "12px", backgroundColor: "#334155", color: "#cbd5e1", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", marginTop: "10px" }}>
-                🔄 Reset Dispatch Trip
-              </button>
-            </div>
-          </div>
-        )
+        </div>
       )}
 
-      {/* --- TRAFFIC POLICE HQ VIEW --- */}
-      {role === "hq" && (
-        !isHqLoggedIn ? (
-          <div style={{ maxWidth: "400px", margin: "40px auto 0 auto", backgroundColor: "#111827", padding: "28px", borderRadius: "10px", border: "1px solid #1e293b" }}>
-            <h2 style={{ margin: "0 0 6px 0", fontSize: "1.3rem", color: "#38bdf8", textAlign: "center" }}>
-              🚨 Traffic Police HQ Sign In
-            </h2>
-            <p style={{ margin: "0 0 20px 0", fontSize: "0.85rem", color: "#94a3b8", textAlign: "center" }}>
-              Authorized command officer credentials required
-            </p>
-
-            <form onSubmit={handleHqLogin} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>
-                  Officer Badge / Service ID *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. TP-8841"
-                  value={officerBadge}
-                  onChange={(e) => setOfficerBadge(e.target.value)}
-                  style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>
-                  Officer Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Inspector Sharma"
-                  value={officerName}
-                  onChange={(e) => setOfficerName(e.target.value)}
-                  style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>
-                  Control Sector / Zone
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Central Traffic Command Sector 1"
-                  value={commandZone}
-                  onChange={(e) => setCommandZone(e.target.value)}
-                  style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }}
-                />
-              </div>
-
+      {/* ACTIVE APP CONTENT */}
+      {role !== "" && (
+        <>
+          <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1e293b", paddingBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: "1.5rem", color: "#38bdf8" }}>
+                {role === "hq" ? "🚨 TRAFFIC POLICE COMMAND HQ" : "🚑 AMBULANCE ON-BOARD DISPATCH"}
+              </h1>
+              <p style={{ margin: "4px 0 0 0", color: "#94a3b8", fontSize: "0.85rem" }}>
+                {role === "hq" ? "Central Intersection Override & Green Wave Command" : "Emergency Priority Broadcast & Route Fast Track"}
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
               <button
-                type="submit"
-                style={{ marginTop: "10px", padding: "12px", backgroundColor: "#15803d", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}
+                onClick={() => {
+                  window.location.search = "";
+                }}
+                style={{ padding: "6px 12px", borderRadius: "6px", backgroundColor: "#334155", color: "#f8fafc", border: "1px solid #475569", cursor: "pointer", fontSize: "0.8rem", fontWeight: "bold" }}
               >
-                Access Command Room →
+                ← Back to Portal Home
               </button>
-            </form>
+              <span style={{ padding: "6px 12px", borderRadius: "999px", fontSize: "0.75rem", fontWeight: "bold", backgroundColor: connected ? "#064e3b" : "#450a0a", color: connected ? "#34d399" : "#fca5a5" }}>
+                {connected ? "● LIVE CLOUD SYNC" : "○ DISCONNECTED"}
+              </span>
+            </div>
+          </header>
+
+          <div style={{ marginTop: "14px", padding: "12px", borderRadius: "8px", fontWeight: "bold", textAlign: "center", backgroundColor: state.emergency_active ? (state.police_decision.includes("REJECTED") ? "#450a0a" : "#064e3b") : "#1e293b", border: "1px solid #334155", color: "#f8fafc" }}>
+            STATUS: {state.alert}
           </div>
-        ) : (
-          <div style={{ marginTop: "16px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", padding: "8px 12px", backgroundColor: "#1e293b", borderRadius: "6px" }}>
-              <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
-                Duty Officer: <strong style={{ color: "#38bdf8" }}>{officerName}</strong> ({officerBadge}) | Sector: <strong style={{ color: "#f8fafc" }}>{commandZone || "Central Command"}</strong>
-              </div>
-              <button
-                onClick={() => setIsHqLoggedIn(false)}
-                style={{ padding: "4px 8px", backgroundColor: "#334155", color: "#fca5a5", border: "1px solid #475569", borderRadius: "4px", fontSize: "0.75rem", cursor: "pointer" }}
-              >
-                End Duty / Logout
-              </button>
-            </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-              <div style={{ backgroundColor: "#111827", padding: "14px", borderRadius: "8px", border: "1px solid #1e293b" }}>
-                <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>AMBULANCE LOCATION</div>
-                <div style={{ fontSize: "1rem", fontWeight: "bold", marginTop: "4px" }}>{state.ambulance_location}</div>
-              </div>
-              <div style={{ backgroundColor: "#111827", padding: "14px", borderRadius: "8px", border: `1px solid ${badgeStyle.border}` }}>
-                <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>PATIENT SEVERITY</div>
-                <div style={{ fontSize: "1rem", fontWeight: "bold", marginTop: "4px", color: badgeStyle.text }}>{state.severity || "NONE"}</div>
-              </div>
-              <div style={{ backgroundColor: "#111827", padding: "14px", borderRadius: "8px", border: "1px solid #1e293b" }}>
-                <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>ETA & DISTANCE</div>
-                <div style={{ fontSize: "1rem", fontWeight: "bold", marginTop: "4px", color: "#38bdf8" }}>{state.eta_seconds}s ({state.distance_km} km)</div>
-              </div>
-              <div style={{ backgroundColor: "#111827", padding: "14px", borderRadius: "8px", border: "1px solid #1e293b" }}>
-                <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>ASSIGNED ROUTE</div>
-                <div style={{ fontSize: "1rem", fontWeight: "bold", marginTop: "4px", color: "#f59e0b" }}>{state.route_name}</div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: "16px", backgroundColor: "#111827", padding: "16px", borderRadius: "8px", border: "1px solid #1e293b" }}>
-              <h4 style={{ margin: "0 0 12px 0", color: "#cbd5e1", fontSize: "0.8rem", textTransform: "uppercase" }}>Corridor Signals ({state.signals.length} Intersections)</h4>
-              <div style={{ display: "grid", gridTemplateColumns: `repeat(${state.signals.length}, 1fr)`, gap: "10px" }}>
-                {state.signals.map((sig) => (
-                  <div key={sig.id} style={{ backgroundColor: "#1f2937", border: "1px solid #374151", borderRadius: "6px", padding: "14px", textAlign: "center" }}>
-                    <div style={{ fontSize: "0.8rem", color: "#e2e8f0", marginBottom: "8px" }}>{sig.name}</div>
-                    <span style={{ display: "inline-block", padding: "5px 14px", borderRadius: "20px", fontWeight: "bold", fontSize: "0.8rem", backgroundColor: sig.status === "GREEN" ? "#15803d" : sig.status === "PREPARING" ? "#b45309" : "#b91c1c", color: "#fff" }}>
-                      {sig.status}
-                    </span>
+          {/* AMBULANCE VIEW */}
+          {role === "ambulance" && (
+            !isAmbulanceLoggedIn ? (
+              <div style={{ maxWidth: "400px", margin: "40px auto 0 auto", backgroundColor: "#111827", padding: "28px", borderRadius: "10px", border: "1px solid #1e293b" }}>
+                <h2 style={{ margin: "0 0 6px 0", fontSize: "1.3rem", color: "#38bdf8", textAlign: "center" }}>
+                  🚑 Ambulance Driver Sign In
+                </h2>
+                <form onSubmit={handleAmbulanceLogin} style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "20px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>Vehicle / Ambulance ID *</label>
+                    <input type="text" required placeholder="e.g. AMB-108" value={ambulanceId} onChange={(e) => setAmbulanceId(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }} />
                   </div>
-                ))}
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>Driver Name *</label>
+                    <input type="text" required placeholder="e.g. Jeshwanth" value={driverName} onChange={(e) => setDriverName(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>Hospital / Base Center</label>
+                    <input type="text" placeholder="e.g. Apollo Hospital" value={hospitalName} onChange={(e) => setHospitalName(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }} />
+                  </div>
+                  <button type="submit" style={{ marginTop: "10px", padding: "12px", backgroundColor: "#0284c7", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}>
+                    Access Dispatch Console →
+                  </button>
+                </form>
               </div>
-            </div>
+            ) : (
+              <div style={{ marginTop: "20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", padding: "8px 12px", backgroundColor: "#1e293b", borderRadius: "6px" }}>
+                  <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
+                    Active Vehicle: <strong style={{ color: "#38bdf8" }}>{ambulanceId}</strong> | Driver: <strong style={{ color: "#f8fafc" }}>{driverName}</strong>
+                  </div>
+                  <button onClick={() => setIsAmbulanceLoggedIn(false)} style={{ padding: "4px 8px", backgroundColor: "#334155", color: "#fca5a5", border: "1px solid #475569", borderRadius: "4px", fontSize: "0.75rem", cursor: "pointer" }}>Logout</button>
+                </div>
+                <div style={{ backgroundColor: "#111827", padding: "18px", borderRadius: "8px", border: "1px solid #1e293b", marginBottom: "16px" }}>
+                  <h3 style={{ margin: "0 0 12px 0", color: "#38bdf8", fontSize: "1.1rem" }}>📍 LIVE NAVIGATION</h3>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                    <div style={{ backgroundColor: "#1f2937", padding: "12px", borderRadius: "6px" }}>
+                      <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>CURRENT CORRIDOR</div>
+                      <div style={{ fontSize: "1.1rem", fontWeight: "bold", color: "#fbbf24" }}>{state.route_name}</div>
+                    </div>
+                    <div style={{ backgroundColor: "#1f2937", padding: "12px", borderRadius: "6px" }}>
+                      <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>ETA / DISTANCE</div>
+                      <div style={{ fontSize: "1.1rem", fontWeight: "bold", color: "#38bdf8" }}>{state.eta_seconds}s ({state.distance_km} km)</div>
+                    </div>
+                  </div>
+                </div>
+                <h3 style={{ color: "#e2e8f0", fontSize: "1rem", marginBottom: "10px" }}>SELECT PATIENT EMERGENCY SEVERITY:</h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <button onClick={() => handleAction("TRIGGER_EMERGENCY", "CRITICAL (CODE RED)")} style={{ padding: "18px", backgroundColor: "#dc2626", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "1.1rem", cursor: "pointer" }}>🔴 CODE RED: CRITICAL (CARDIAC / TRAUMA)</button>
+                  <button onClick={() => handleAction("TRIGGER_EMERGENCY", "URGENT (CODE YELLOW)")} style={{ padding: "16px", backgroundColor: "#d97706", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}>🟡 CODE YELLOW: URGENT (STABLE / MONITORING)</button>
+                  <button onClick={() => handleAction("TRIGGER_EMERGENCY", "ROUTINE (CODE GREEN)")} style={{ padding: "14px", backgroundColor: "#059669", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "0.95rem", cursor: "pointer" }}>🟢 CODE GREEN: ROUTINE TRANSFER</button>
+                  <button onClick={() => handleAction("RESET_NORMAL")} style={{ padding: "12px", backgroundColor: "#334155", color: "#cbd5e1", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", marginTop: "10px" }}>🔄 Reset Dispatch Trip</button>
+                </div>
+              </div>
+            )
+          )}
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "16px" }}>
-              <button onClick={() => handleAction("POLICE_APPROVE")} style={{ padding: "14px", backgroundColor: "#059669", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}>
-                [ APPROVE GREEN WAVE ]
-              </button>
-              <button onClick={() => handleAction("POLICE_REJECT")} style={{ padding: "14px", backgroundColor: "#dc2626", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}>
-                [ REJECT CORRIDOR ]
-              </button>
-            </div>
-
-            <div style={{ marginTop: "16px", backgroundColor: "#111827", padding: "14px", borderRadius: "8px", border: "1px solid #1e293b", display: "flex", gap: "10px", flexWrap: "wrap" }}>
-              <button onClick={() => handleAction("TOGGLE_ROAD_BLOCK")} style={{ padding: "8px 12px", backgroundColor: "#1e293b", border: "1px solid #f59e0b", color: "#fbbf24", borderRadius: "4px", cursor: "pointer", fontWeight: "bold", fontSize: "0.8rem" }}>
-                🚧 Block Corridor
-              </button>
-              <button onClick={() => handleAction("TOGGLE_OPERATOR")} style={{ padding: "8px 12px", backgroundColor: "#1e293b", border: "1px solid #8b5cf6", color: "#a78bfa", borderRadius: "4px", cursor: "pointer", fontWeight: "bold", fontSize: "0.8rem" }}>
-                👮 Operator Failover
-              </button>
-              <button onClick={() => handleAction("RESET_NORMAL")} style={{ padding: "8px 12px", backgroundColor: "#1e293b", border: "1px solid #64748b", color: "#94a3b8", borderRadius: "4px", cursor: "pointer", fontWeight: "bold", fontSize: "0.8rem" }}>
-                🔄 Reset Normal
-              </button>
-            </div>
-          </div>
-        )
+          {/* HQ VIEW */}
+          {role === "hq" && (
+            !isHqLoggedIn ? (
+              <div style={{ maxWidth: "400px", margin: "40px auto 0 auto", backgroundColor: "#111827", padding: "28px", borderRadius: "10px", border: "1px solid #1e293b" }}>
+                <h2 style={{ margin: "0 0 6px 0", fontSize: "1.3rem", color: "#38bdf8", textAlign: "center" }}>
+                  🚨 Traffic Police HQ Sign In
+                </h2>
+                <form onSubmit={handleHqLogin} style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "20px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>Officer Badge / Service ID *</label>
+                    <input type="text" required placeholder="e.g. TP-8841" value={officerBadge} onChange={(e) => setOfficerBadge(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>Officer Name *</label>
+                    <input type="text" required placeholder="e.g. Inspector Sharma" value={officerName} onChange={(e) => setOfficerName(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>Control Sector / Zone</label>
+                    <input type="text" placeholder="e.g. Sector 1" value={commandZone} onChange={(e) => setCommandZone(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }} />
+                  </div>
+                  <button type="submit" style={{ marginTop: "10px", padding: "12px", backgroundColor: "#15803d", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}>
+                    Access Command Room →
+                  </button>
+                </form>
+              </div>
+            ) : (
+              <div style={{ marginTop: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", padding: "8px 12px", backgroundColor: "#1e293b", borderRadius: "6px" }}>
+                  <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
+                    Duty Officer: <strong style={{ color: "#38bdf8" }}>{officerName}</strong> ({officerBadge})
+                  </div>
+                  <button onClick={() => setIsHqLoggedIn(false)} style={{ padding: "4px 8px", backgroundColor: "#334155", color: "#fca5a5", border: "1px solid #475569", borderRadius: "4px", fontSize: "0.75rem", cursor: "pointer" }}>Logout</button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+                  <div style={{ backgroundColor: "#111827", padding: "14px", borderRadius: "8px", border: "1px solid #1e293b" }}>
+                    <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>AMBULANCE LOCATION</div>
+                    <div style={{ fontSize: "1rem", fontWeight: "bold", marginTop: "4px" }}>{state.ambulance_location}</div>
+                  </div>
+                  <div style={{ backgroundColor: "#111827", padding: "14px", borderRadius: "8px", border: `1px solid ${badgeStyle.border}` }}>
+                    <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>PATIENT SEVERITY</div>
+                    <div style={{ fontSize: "1rem", fontWeight: "bold", marginTop: "4px", color: badgeStyle.text }}>{state.severity || "NONE"}</div>
+                  </div>
+                  <div style={{ backgroundColor: "#111827", padding: "14px", borderRadius: "8px", border: "1px solid #1e293b" }}>
+                    <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>ETA & DISTANCE</div>
+                    <div style={{ fontSize: "1rem", fontWeight: "bold", marginTop: "4px", color: "#38bdf8" }}>{state.eta_seconds}s ({state.distance_km} km)</div>
+                  </div>
+                  <div style={{ backgroundColor: "#111827", padding: "14px", borderRadius: "8px", border: "1px solid #1e293b" }}>
+                    <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>ASSIGNED ROUTE</div>
+                    <div style={{ fontSize: "1rem", fontWeight: "bold", marginTop: "4px", color: "#f59e0b" }}>{state.route_name}</div>
+                  </div>
+                </div>
+                <div style={{ marginTop: "16px", backgroundColor: "#111827", padding: "16px", borderRadius: "8px", border: "1px solid #1e293b" }}>
+                  <h4 style={{ margin: "0 0 12px 0", color: "#cbd5e1", fontSize: "0.8rem", textTransform: "uppercase" }}>Corridor Signals ({state.signals.length} Intersections)</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: `repeat(${state.signals.length}, 1fr)`, gap: "10px" }}>
+                    {state.signals.map((sig) => (
+                      <div key={sig.id} style={{ backgroundColor: "#1f2937", border: "1px solid #374151", borderRadius: "6px", padding: "14px", textAlign: "center" }}>
+                        <div style={{ fontSize: "0.8rem", color: "#e2e8f0", marginBottom: "8px" }}>{sig.name}</div>
+                        <span style={{ display: "inline-block", padding: "5px 14px", borderRadius: "20px", fontWeight: "bold", fontSize: "0.8rem", backgroundColor: sig.status === "GREEN" ? "#15803d" : sig.status === "PREPARING" ? "#b45309" : "#b91c1c", color: "#fff" }}>
+                          {sig.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "16px" }}>
+                  <button onClick={() => handleAction("POLICE_APPROVE")} style={{ padding: "14px", backgroundColor: "#059669", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}>[ APPROVE GREEN WAVE ]</button>
+                  <button onClick={() => handleAction("POLICE_REJECT")} style={{ padding: "14px", backgroundColor: "#dc2626", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}>[ REJECT CORRIDOR ]</button>
+                </div>
+              </div>
+            )
+          )}
+        </>
       )}
     </div>
   );
