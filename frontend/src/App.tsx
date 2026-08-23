@@ -57,7 +57,7 @@ export default function App() {
         ? "ws://127.0.0.1:8765/ws"
         : "wss://traffic-backend-4e01.onrender.com/ws";
 
-    let reconnectTimer: NodeJS.Timeout;
+    let reconnectTimer: ReturnType<typeof setTimeout>;
 
     function connect() {
       try {
@@ -156,7 +156,7 @@ export default function App() {
         STATUS: {state.alert}
       </div>
 
-      {/* Ambulance Specific Layout */}
+      {/* Ambulance Layout */}
       {role === "ambulance" ? (
         <div style={{ marginTop: "20px" }}>
           <div style={{ backgroundColor: "#111827", padding: "18px", borderRadius: "8px", border: "1px solid #1e293b", marginBottom: "16px" }}>
@@ -198,7 +198,6 @@ export default function App() {
       ) : (
         /* HQ Operator Layout */
         <div style={{ marginTop: "16px" }}>
-          {/* Telemetry */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
             <div style={{ backgroundColor: "#111827", padding: "14px", borderRadius: "8px", border: "1px solid #1e293b" }}>
               <div style={{ fontSize: "0.7rem", color: "#94a3b8" }}>AMBULANCE LOCATION</div>
@@ -218,7 +217,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Corridor Intersections */}
           <div style={{ marginTop: "16px", backgroundColor: "#111827", padding: "16px", borderRadius: "8px", border: "1px solid #1e293b" }}>
             <h4 style={{ margin: "0 0 12px 0", color: "#cbd5e1", fontSize: "0.8rem", textTransform: "uppercase" }}>Corridor Signals ({state.signals.length} Intersections)</h4>
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${state.signals.length}, 1fr)`, gap: "10px" }}>
@@ -233,7 +231,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Operator Action Buttons */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "16px" }}>
             <button onClick={() => handleAction("POLICE_APPROVE")} style={{ padding: "14px", backgroundColor: "#059669", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}>
               [ APPROVE GREEN WAVE ]
@@ -243,7 +240,6 @@ export default function App() {
             </button>
           </div>
 
-          {/* Overrides */}
           <div style={{ marginTop: "16px", backgroundColor: "#111827", padding: "14px", borderRadius: "8px", border: "1px solid #1e293b", display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <button onClick={() => handleAction("TOGGLE_ROAD_BLOCK")} style={{ padding: "8px 12px", backgroundColor: "#1e293b", border: "1px solid #f59e0b", color: "#fbbf24", borderRadius: "4px", cursor: "pointer", fontWeight: "bold", fontSize: "0.8rem" }}>
               🚧 Block Corridor
