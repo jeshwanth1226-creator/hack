@@ -43,10 +43,7 @@ const DEFAULT_STATE: CorridorState = {
 export default function App() {
   const [state, setState] = useState<CorridorState>(DEFAULT_STATE);
   const [connected, setConnected] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
   const [role, setRole] = useState<"hq" | "ambulance">("hq");
-
-  // Broadcast channel for instantaneous cross-tab sync even without cloud lag
   const bcRef = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
