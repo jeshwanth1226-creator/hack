@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef, useCallback } from "react";
 import "./App.css";
 
-const BACKEND_URL = "https://traffic-backend-4e8l.onrender.com";
+const BACKEND_URL = "https://traffic-backend-nnpp.onrender.com";
 
 interface Signal {
   id: number;
@@ -436,3 +436,4 @@ export default function App() {
     </div>
   );
 }
+
