@@ -54,8 +54,8 @@ export default function App() {
 
     const WS_URL =
       window.location.hostname === "localhost"
-        ? "ws://127.0.0.1:8765"
-        : "wss://traffic-backend-4e61.onrender.com";
+        ? "ws://127.0.0.1:8765/ws"
+        : "wss://traffic-backend-4e61.onrender.com/ws";
 
     let reconnectTimer: NodeJS.Timeout;
 
@@ -65,7 +65,7 @@ export default function App() {
         wsRef.current = ws;
 
         ws.onopen = () => {
-          console.log("WebSocket connected to cloud backend");
+          console.log("WebSocket connected successfully");
           setConnected(true);
         };
 
@@ -89,7 +89,8 @@ export default function App() {
           reconnectTimer = setTimeout(connect, 3000);
         };
 
-        ws.onerror = () => {
+        ws.onerror = (err) => {
+          console.error("WS Error:", err);
           setConnected(false);
           ws.close();
         };
@@ -146,7 +147,7 @@ export default function App() {
             Switch to {role === "hq" ? "🚑 Ambulance App" : "🚨 HQ App"}
           </button>
           <span style={{ padding: "6px 12px", borderRadius: "999px", fontSize: "0.75rem", fontWeight: "bold", backgroundColor: connected ? "#064e3b" : "#450a0a", color: connected ? "#34d399" : "#fca5a5" }}>
-            {connected ? "● CLOUD SYNCED" : "○ CONNECTING / WAKING UP..."}
+            {connected ? "● CLOUD SYNCED" : "○ DISCONNECTED"}
           </span>
         </div>
       </header>
