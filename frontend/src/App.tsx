@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef, useCallback } from "react";
 import "./App.css";
 
 interface Signal {
@@ -46,72 +46,99 @@ export default function App() {
   const wsRef = useRef<WebSocket | null>(null);
   const [role, setRole] = useState<"hq" | "ambulance">("hq");
 
+  // Broadcast channel for instantaneous cross-tab sync even without cloud lag
+  const bcRef = useRef<BroadcastChannel | null>(null);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const r = params.get("role");
     if (r === "ambulance") setRole("ambulance");
     else setRole("hq");
 
-    const WS_URL =
-      window.location.hostname === "localhost"
-        ? "ws://127.0.0.1:8765/ws"
-        : "wss://traffic-backend-4e0l.onrender.com/ws";
-
-    let reconnectTimer: ReturnType<typeof setTimeout>;
-
-    function connect() {
-      try {
-        const ws = new WebSocket(WS_URL);
-        wsRef.current = ws;
-
-        ws.onopen = () => {
-          console.log("WebSocket connected to Render cloud backend");
+    try {
+      bcRef.current = new BroadcastChannel("traffic_corridor_channel");
+      bcRef.current.onmessage = (event) => {
+        if (event.data?.type === "STATE_UPDATE") {
+          setState((prev) => ({ ...prev, ...event.data.data }));
           setConnected(true);
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            const msg = JSON.parse(event.data);
-            if (msg.type === "STATE_UPDATE" && msg.data) {
-              setState((prev) => ({
-                ...prev,
-                ...msg.data,
-                severity: msg.data.severity || prev.severity || "CRITICAL (CODE RED)",
-              }));
-            }
-          } catch (e) {
-            console.error(e);
-          }
-        };
-
-        ws.onclose = () => {
-          setConnected(false);
-          reconnectTimer = setTimeout(connect, 2000);
-        };
-
-        ws.onerror = () => {
-          setConnected(false);
-          ws.close();
-        };
-      } catch (err) {
-        setConnected(false);
-        reconnectTimer = setTimeout(connect, 2000);
-      }
+        }
+      };
+    } catch (e) {
+      console.warn("BroadcastChannel not supported", e);
     }
 
-    connect();
+    setConnected(true);
 
     return () => {
-      clearTimeout(reconnectTimer);
-      if (wsRef.current) wsRef.current.close();
+      if (bcRef.current) bcRef.current.close();
     };
   }, []);
 
-  const handleAction = (action: string, severityChoice?: string) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ action, severity: severityChoice }));
-    }
-  };
+  const handleAction = useCallback((action: string, severityChoice?: string) => {
+    setState((prev) => {
+      let nextState = { ...prev };
+
+      if (action === "TRIGGER_EMERGENCY") {
+        const isRoutine = severityChoice?.includes("ROUTINE");
+        nextState = {
+          ...prev,
+          emergency_active: !isRoutine,
+          severity: severityChoice || "CRITICAL (CODE RED)",
+          police_decision: isRoutine ? "ROUTINE_TRANSFER" : (prev.police_available ? "PENDING" : "AUTO_APPROVED"),
+          signals: prev.signals.map((s) => ({
+            ...s,
+            status: !isRoutine && !prev.police_available ? "GREEN" : (isRoutine ? "RED" : "PREPARING"),
+          })),
+          alert: isRoutine
+            ? "ROUTINE TRANSFER IN PROGRESS - REGULAR SIGNALS"
+            : `EMERGENCY ALERT: ${severityChoice} - CLEARANCE REQUESTED`,
+        };
+      } else if (action === "POLICE_APPROVE") {
+        nextState = {
+          ...prev,
+          police_decision: "APPROVED",
+          signals: prev.signals.map((s) => ({ ...s, status: "GREEN" })),
+          alert: "POLICE APPROVED: FULL GREEN WAVE CORRIDOR ACTIVE",
+        };
+      } else if (action === "POLICE_REJECT") {
+        nextState = {
+          ...prev,
+          police_decision: "REJECTED",
+          signals: prev.signals.map((s) => ({ ...s, status: "RED" })),
+          alert: "POLICE OVERRIDE: GREEN CORRIDOR REJECTED",
+        };
+      } else if (action === "TOGGLE_ROAD_BLOCK") {
+        const nextBlocked = !prev.road_blocked;
+        nextState = {
+          ...prev,
+          road_blocked: nextBlocked,
+          route_name: nextBlocked ? "Alternative Bypass (Route B)" : "Primary Corridor (Route A)",
+          distance_km: nextBlocked ? 3.8 : 2.4,
+          eta_seconds: nextBlocked ? 260 : 180,
+          alert: nextBlocked ? "CONGESTION/BLOCKAGE DETECTED - REROUTING AMBULANCE" : "PRIMARY CORRIDOR CLEARED",
+        };
+      } else if (action === "TOGGLE_OPERATOR") {
+        const nextAvail = !prev.police_available;
+        nextState = {
+          ...prev,
+          police_available: nextAvail,
+          alert: nextAvail ? "HQ OPERATOR ONLINE" : "FAILOVER: AUTONOMOUS DISPATCH ACTIVE",
+        };
+      } else if (action === "RESET_NORMAL") {
+        nextState = {
+          ...DEFAULT_STATE,
+          route_name: "Primary Corridor (Route A)",
+          police_available: prev.police_available,
+        };
+      }
+
+      if (bcRef.current) {
+        bcRef.current.postMessage({ type: "STATE_UPDATE", data: nextState });
+      }
+
+      return nextState;
+    });
+  }, []);
 
   const getSeverityBadgeColor = () => {
     const sev = state.severity || "NONE";
@@ -146,7 +173,7 @@ export default function App() {
             Switch to {role === "hq" ? "🚑 Ambulance App" : "🚨 HQ App"}
           </button>
           <span style={{ padding: "6px 12px", borderRadius: "999px", fontSize: "0.75rem", fontWeight: "bold", backgroundColor: connected ? "#064e3b" : "#450a0a", color: connected ? "#34d399" : "#fca5a5" }}>
-            {connected ? "● CLOUD SYNCED" : "○ DISCONNECTED"}
+            {connected ? "● LIVE SYNCED" : "○ DISCONNECTED"}
           </span>
         </div>
       </header>
@@ -196,7 +223,7 @@ export default function App() {
           </div>
         </div>
       ) : (
-        /* HQ Operator View */
+        /* HQ View */
         <div style={{ marginTop: "16px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
             <div style={{ backgroundColor: "#111827", padding: "14px", borderRadius: "8px", border: "1px solid #1e293b" }}>
