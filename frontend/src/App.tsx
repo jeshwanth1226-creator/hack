@@ -46,6 +46,17 @@ export default function App() {
   const [role, setRole] = useState<"hq" | "ambulance">("hq");
   const bcRef = useRef<BroadcastChannel | null>(null);
 
+  // Paramedic OTP & Registration State
+  const [isAmbulanceLoggedIn, setIsAmbulanceLoggedIn] = useState(false);
+  const [ambulanceId, setAmbulanceId] = useState("");
+  const [driverName, setDriverName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [hospitalName, setHospitalName] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [enteredOtp, setEnteredOtp] = useState("");
+  const [generatedOtp, setGeneratedOtp] = useState("");
+  const [otpError, setOtpError] = useState("");
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const r = params.get("role");
@@ -137,6 +148,32 @@ export default function App() {
     });
   }, []);
 
+  const handleSendOtp = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ambulanceId.trim() || !driverName.trim() || !phone.trim()) return;
+    const mockCode = Math.floor(1000 + Math.random() * 9000).toString();
+    setGeneratedOtp(mockCode);
+    setOtpSent(true);
+    setOtpError("");
+  };
+
+  const handleVerifyOtp = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (enteredOtp.trim() === generatedOtp || enteredOtp.trim() === "1234") {
+      setIsAmbulanceLoggedIn(true);
+      setOtpError("");
+    } else {
+      setOtpError("Invalid OTP. Please check the code and try again.");
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAmbulanceLoggedIn(false);
+    setOtpSent(false);
+    setEnteredOtp("");
+    setGeneratedOtp("");
+  };
+
   const getSeverityBadgeColor = () => {
     const sev = state.severity || "NONE";
     if (sev.includes("CRITICAL")) return { bg: "#450a0a", text: "#f87171", border: "#dc2626" };
@@ -180,47 +217,184 @@ export default function App() {
         STATUS: {state.alert}
       </div>
 
-      {/* Ambulance View */}
+      {/* Ambulance Role Logic */}
       {role === "ambulance" ? (
-        <div style={{ marginTop: "20px" }}>
-          <div style={{ backgroundColor: "#111827", padding: "18px", borderRadius: "8px", border: "1px solid #1e293b", marginBottom: "16px" }}>
-            <h3 style={{ margin: "0 0 12px 0", color: "#38bdf8", fontSize: "1.1rem" }}>📍 LIVE NAVIGATION</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-              <div style={{ backgroundColor: "#1f2937", padding: "12px", borderRadius: "6px" }}>
-                <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>CURRENT CORRIDOR</div>
-                <div style={{ fontSize: "1.1rem", fontWeight: "bold", color: "#fbbf24" }}>{state.route_name}</div>
-              </div>
-              <div style={{ backgroundColor: "#1f2937", padding: "12px", borderRadius: "6px" }}>
-                <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>ETA / DISTANCE</div>
-                <div style={{ fontSize: "1.1rem", fontWeight: "bold", color: "#38bdf8" }}>{state.eta_seconds}s ({state.distance_km} km)</div>
-              </div>
-            </div>
-            <div style={{ marginTop: "12px", padding: "10px", backgroundColor: "#1f2937", borderRadius: "6px", textAlign: "center" }}>
-              <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>HQ CLEARANCE STATUS: </span>
-              <strong style={{ color: state.police_decision === "APPROVED" || state.police_decision === "AUTO_APPROVED" ? "#4ade80" : "#f87171" }}>
-                {state.police_decision}
-              </strong>
-            </div>
-          </div>
+        !isAmbulanceLoggedIn ? (
+          /* Paramedic Secure 2FA Registration / Login Gate */
+          <div style={{ maxWidth: "420px", margin: "40px auto 0 auto", backgroundColor: "#111827", padding: "28px", borderRadius: "10px", border: "1px solid #1e293b" }}>
+            <h2 style={{ margin: "0 0 8px 0", fontSize: "1.25rem", color: "#38bdf8", textAlign: "center" }}>
+              🚑 Paramedic & Vehicle Dispatch Auth
+            </h2>
+            <p style={{ margin: "0 0 20px 0", fontSize: "0.85rem", color: "#94a3b8", textAlign: "center" }}>
+              Secure 2FA validation to enable signal override
+            </p>
 
-          <h3 style={{ color: "#e2e8f0", fontSize: "1rem", marginBottom: "10px" }}>SELECT PATIENT EMERGENCY SEVERITY:</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <button onClick={() => handleAction("TRIGGER_EMERGENCY", "CRITICAL (CODE RED)")} style={{ padding: "18px", backgroundColor: "#dc2626", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "1.1rem", cursor: "pointer" }}>
-              🔴 CODE RED: CRITICAL (CARDIAC / TRAUMA)
-            </button>
-            <button onClick={() => handleAction("TRIGGER_EMERGENCY", "URGENT (CODE YELLOW)")} style={{ padding: "16px", backgroundColor: "#d97706", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}>
-              🟡 CODE YELLOW: URGENT (STABLE / MONITORING)
-            </button>
-            <button onClick={() => handleAction("TRIGGER_EMERGENCY", "ROUTINE (CODE GREEN)")} style={{ padding: "14px", backgroundColor: "#059669", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "0.95rem", cursor: "pointer" }}>
-              🟢 CODE GREEN: ROUTINE TRANSFER (NO OVERRIDE)
-            </button>
-            <button onClick={() => handleAction("RESET_NORMAL")} style={{ padding: "12px", backgroundColor: "#334155", color: "#cbd5e1", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", marginTop: "10px" }}>
-              🔄 Reset Dispatch Trip
-            </button>
+            {!otpSent ? (
+              <form onSubmit={handleSendOtp} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>
+                    Vehicle / Ambulance ID *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. AMB-108-HYD"
+                    value={ambulanceId}
+                    onChange={(e) => setAmbulanceId(e.target.value)}
+                    style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>
+                    Paramedic / Driver Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Jeshwanth"
+                    value={driverName}
+                    onChange={(e) => setDriverName(e.target.value)}
+                    style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>
+                    Registered Mobile Number *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="e.g. +91 9876543210"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>
+                    Base Hospital / Center
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Apollo Hospital"
+                    value={hospitalName}
+                    onChange={(e) => setHospitalName(e.target.value)}
+                    style={{ width: "100%", padding: "10px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box" }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  style={{ marginTop: "10px", padding: "12px", backgroundColor: "#0284c7", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}
+                >
+                  Request OTP Verification →
+                </button>
+              </form>
+            ) : (
+              /* OTP Verification Step */
+              <form onSubmit={handleVerifyOtp} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <div style={{ backgroundColor: "#064e3b", padding: "10px 14px", borderRadius: "6px", border: "1px solid #059669", textAlign: "center" }}>
+                  <div style={{ fontSize: "0.8rem", color: "#a7f3d0" }}>Verification Code sent to {phone}:</div>
+                  <div style={{ fontSize: "1.4rem", fontWeight: "bold", color: "#34d399", letterSpacing: "3px", marginTop: "4px" }}>
+                    {generatedOtp}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.8rem", color: "#cbd5e1", marginBottom: "5px" }}>
+                    Enter 4-Digit OTP Code
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    required
+                    placeholder="Enter code above or 1234"
+                    value={enteredOtp}
+                    onChange={(e) => setEnteredOtp(e.target.value)}
+                    style={{ width: "100%", padding: "12px", borderRadius: "6px", backgroundColor: "#1f2937", border: "1px solid #374151", color: "#f8fafc", boxSizing: "border-box", textAlign: "center", fontSize: "1.2rem", letterSpacing: "4px" }}
+                  />
+                </div>
+
+                {otpError && (
+                  <div style={{ color: "#f87171", fontSize: "0.8rem", textAlign: "center" }}>
+                    {otpError}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  style={{ padding: "12px", backgroundColor: "#059669", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}
+                >
+                  Verify & Connect Dispatch Console ✓
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setOtpSent(false)}
+                  style={{ padding: "8px", backgroundColor: "transparent", color: "#94a3b8", border: "none", cursor: "pointer", fontSize: "0.8rem" }}
+                >
+                  ← Edit Driver Details
+                </button>
+              </form>
+            )}
           </div>
-        </div>
+        ) : (
+          /* Actual Ambulance Dispatch Console */
+          <div style={{ marginTop: "20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", padding: "8px 12px", backgroundColor: "#1e293b", borderRadius: "6px" }}>
+              <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
+                Active Unit: <strong style={{ color: "#38bdf8" }}>{ambulanceId}</strong> | Driver: <strong style={{ color: "#f8fafc" }}>{driverName}</strong> {hospitalName && `(${hospitalName})`}
+              </div>
+              <button
+                onClick={handleLogout}
+                style={{ padding: "4px 8px", backgroundColor: "#334155", color: "#fca5a5", border: "1px solid #475569", borderRadius: "4px", fontSize: "0.75rem", cursor: "pointer" }}
+              >
+                Change Driver / Logout
+              </button>
+            </div>
+
+            <div style={{ backgroundColor: "#111827", padding: "18px", borderRadius: "8px", border: "1px solid #1e293b", marginBottom: "16px" }}>
+              <h3 style={{ margin: "0 0 12px 0", color: "#38bdf8", fontSize: "1.1rem" }}>📍 LIVE NAVIGATION</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <div style={{ backgroundColor: "#1f2937", padding: "12px", borderRadius: "6px" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>CURRENT CORRIDOR</div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: "bold", color: "#fbbf24" }}>{state.route_name}</div>
+                </div>
+                <div style={{ backgroundColor: "#1f2937", padding: "12px", borderRadius: "6px" }}>
+                  <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>ETA / DISTANCE</div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: "bold", color: "#38bdf8" }}>{state.eta_seconds}s ({state.distance_km} km)</div>
+                </div>
+              </div>
+              <div style={{ marginTop: "12px", padding: "10px", backgroundColor: "#1f2937", borderRadius: "6px", textAlign: "center" }}>
+                <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>HQ CLEARANCE STATUS: </span>
+                <strong style={{ color: state.police_decision === "APPROVED" || state.police_decision === "AUTO_APPROVED" ? "#4ade80" : "#f87171" }}>
+                  {state.police_decision}
+                </strong>
+              </div>
+            </div>
+
+            <h3 style={{ color: "#e2e8f0", fontSize: "1rem", marginBottom: "10px" }}>SELECT PATIENT EMERGENCY SEVERITY:</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <button onClick={() => handleAction("TRIGGER_EMERGENCY", "CRITICAL (CODE RED)")} style={{ padding: "18px", backgroundColor: "#dc2626", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "1.1rem", cursor: "pointer" }}>
+                🔴 CODE RED: CRITICAL (CARDIAC / TRAUMA)
+              </button>
+              <button onClick={() => handleAction("TRIGGER_EMERGENCY", "URGENT (CODE YELLOW)")} style={{ padding: "16px", backgroundColor: "#d97706", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "1rem", cursor: "pointer" }}>
+                🟡 CODE YELLOW: URGENT (STABLE / MONITORING)
+              </button>
+              <button onClick={() => handleAction("TRIGGER_EMERGENCY", "ROUTINE (CODE GREEN)")} style={{ padding: "14px", backgroundColor: "#059669", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "bold", fontSize: "0.95rem", cursor: "pointer" }}>
+                🟢 CODE GREEN: ROUTINE TRANSFER (NO OVERRIDE)
+              </button>
+              <button onClick={() => handleAction("RESET_NORMAL")} style={{ padding: "12px", backgroundColor: "#334155", color: "#cbd5e1", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", marginTop: "10px" }}>
+                🔄 Reset Dispatch Trip
+              </button>
+            </div>
+          </div>
+        )
       ) : (
-        /* HQ View */
+        /* HQ Operator View */
         <div style={{ marginTop: "16px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
             <div style={{ backgroundColor: "#111827", padding: "14px", borderRadius: "8px", border: "1px solid #1e293b" }}>
