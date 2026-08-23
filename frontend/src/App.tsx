@@ -55,7 +55,7 @@ export default function App() {
     const WS_URL =
       window.location.hostname === "localhost"
         ? "ws://127.0.0.1:8765/ws"
-        : "wss://traffic-backend-4e61.onrender.com/ws";
+        : "wss://traffic-backend-4e01.onrender.com/ws";
 
     let reconnectTimer: NodeJS.Timeout;
 
@@ -65,7 +65,7 @@ export default function App() {
         wsRef.current = ws;
 
         ws.onopen = () => {
-          console.log("WebSocket connected successfully");
+          console.log("WebSocket connected to Render cloud backend");
           setConnected(true);
         };
 
@@ -86,17 +86,16 @@ export default function App() {
 
         ws.onclose = () => {
           setConnected(false);
-          reconnectTimer = setTimeout(connect, 3000);
+          reconnectTimer = setTimeout(connect, 2000);
         };
 
-        ws.onerror = (err) => {
-          console.error("WS Error:", err);
+        ws.onerror = () => {
           setConnected(false);
           ws.close();
         };
       } catch (err) {
         setConnected(false);
-        reconnectTimer = setTimeout(connect, 3000);
+        reconnectTimer = setTimeout(connect, 2000);
       }
     }
 
@@ -126,7 +125,7 @@ export default function App() {
 
   return (
     <div style={{ padding: "20px", fontFamily: "system-ui, sans-serif", backgroundColor: "#0b0f19", color: "#f1f5f9", minHeight: "100vh" }}>
-      {/* Top Header & Role Switcher */}
+      {/* Header */}
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1e293b", paddingBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
         <div>
           <h1 style={{ margin: 0, fontSize: "1.5rem", color: "#38bdf8" }}>
