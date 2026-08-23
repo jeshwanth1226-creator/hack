@@ -1,7 +1,6 @@
-﻿from fastapi import FastAPI, Request
+﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from typing import Dict, Any, List
 
 app = FastAPI(title="Traffic Corridor API")
 
@@ -13,7 +12,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-Memory Storage for Active Corridor State
+# Active Corridor State
 corridor_state = {
     "emergency_active": False,
     "police_available": True,
@@ -33,25 +32,34 @@ corridor_state = {
     "alert": "NORMAL OPERATIONS - SYSTEM READY",
 }
 
-# In-Memory Storage for Logged In Users / Sessions
+# User Logins In-Memory List
 login_sessions: List[Dict[str, Any]] = []
 
 @app.get("/")
 def read_root():
-    return {"status": "online", "system": "Green Corridor Optimization Engine"}
+    return {"status": "online", "system": "Green Corridor Engine"}
 
 @app.get("/status")
 def get_status():
     return corridor_state
 
 @app.get("/users")
-def get_logged_in_users():
-    return {"total_users": len(login_sessions), "sessions": login_sessions}
+def get_users():
+    return {
+        "status": "success",
+        "total_active_logins": len(login_sessions),
+        "users": login_sessions
+    }
 
 @app.post("/login")
 def save_login(payload: Dict[str, Any]):
     login_sessions.append(payload)
-    return {"status": "success", "message": "User login session recorded", "total_sessions": len(login_sessions)}
+    return {
+        "status": "success",
+        "message": "User session recorded",
+        "total_active_logins": len(login_sessions),
+        "data": payload
+    }
 
 @app.post("/action")
 def update_action(payload: Dict[str, Any]):
