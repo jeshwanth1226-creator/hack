@@ -1,6 +1,8 @@
 ﻿import { useState, useEffect, useRef, useCallback } from "react";
 import "./App.css";
 
+const BACKEND_URL = "https://traffic-backend-4e8l.onrender.com";
+
 interface Signal {
   id: number;
   name: string;
@@ -46,17 +48,35 @@ export default function App() {
   const [role, setRole] = useState<"hq" | "ambulance">("hq");
   const bcRef = useRef<BroadcastChannel | null>(null);
 
-  // Ambulance Form Login State
+  // Normal Ambulance Login State
   const [isAmbulanceLoggedIn, setIsAmbulanceLoggedIn] = useState(false);
   const [ambulanceId, setAmbulanceId] = useState("");
   const [driverName, setDriverName] = useState("");
   const [hospitalName, setHospitalName] = useState("");
+
+  // Fetch initial state from Render backend
+  const fetchBackendState = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/status`);
+      if (res.ok) {
+        const data = await res.json();
+        setState((prev) => ({ ...prev, ...data }));
+        setConnected(true);
+      }
+    } catch {
+      // Fallback if backend is cold-starting
+      setConnected(true);
+    }
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const r = params.get("role");
     if (r === "ambulance") setRole("ambulance");
     else setRole("hq");
+
+    fetchBackendState();
+    const interval = setInterval(fetchBackendState, 3000);
 
     try {
       bcRef.current = new BroadcastChannel("traffic_corridor_channel");
@@ -70,78 +90,87 @@ export default function App() {
       console.warn("BroadcastChannel not supported", e);
     }
 
-    setConnected(true);
-
     return () => {
+      clearInterval(interval);
       if (bcRef.current) bcRef.current.close();
     };
   }, []);
 
-  const handleAction = useCallback((action: string, severityChoice?: string) => {
-    setState((prev) => {
-      let nextState = { ...prev };
+  const handleAction = useCallback(async (action: string, severityChoice?: string) => {
+    let nextState = { ...state };
 
-      if (action === "TRIGGER_EMERGENCY") {
-        const isRoutine = severityChoice?.includes("ROUTINE");
-        nextState = {
-          ...prev,
-          emergency_active: !isRoutine,
-          severity: severityChoice || "CRITICAL (CODE RED)",
-          police_decision: isRoutine ? "ROUTINE_TRANSFER" : (prev.police_available ? "PENDING" : "AUTO_APPROVED"),
-          signals: prev.signals.map((s) => ({
-            ...s,
-            status: !isRoutine && !prev.police_available ? "GREEN" : (isRoutine ? "RED" : "PREPARING"),
-          })),
-          alert: isRoutine
-            ? "ROUTINE TRANSFER IN PROGRESS - REGULAR SIGNALS"
-            : `EMERGENCY ALERT: ${severityChoice} - CLEARANCE REQUESTED`,
-        };
-      } else if (action === "POLICE_APPROVE") {
-        nextState = {
-          ...prev,
-          police_decision: "APPROVED",
-          signals: prev.signals.map((s) => ({ ...s, status: "GREEN" })),
-          alert: "POLICE APPROVED: FULL GREEN WAVE CORRIDOR ACTIVE",
-        };
-      } else if (action === "POLICE_REJECT") {
-        nextState = {
-          ...prev,
-          police_decision: "REJECTED",
-          signals: prev.signals.map((s) => ({ ...s, status: "RED" })),
-          alert: "POLICE OVERRIDE: GREEN CORRIDOR REJECTED",
-        };
-      } else if (action === "TOGGLE_ROAD_BLOCK") {
-        const nextBlocked = !prev.road_blocked;
-        nextState = {
-          ...prev,
-          road_blocked: nextBlocked,
-          route_name: nextBlocked ? "Alternative Bypass (Route B)" : "Primary Corridor (Route A)",
-          distance_km: nextBlocked ? 3.8 : 2.4,
-          eta_seconds: nextBlocked ? 260 : 180,
-          alert: nextBlocked ? "CONGESTION/BLOCKAGE DETECTED - REROUTING AMBULANCE" : "PRIMARY CORRIDOR CLEARED",
-        };
-      } else if (action === "TOGGLE_OPERATOR") {
-        const nextAvail = !prev.police_available;
-        nextState = {
-          ...prev,
-          police_available: nextAvail,
-          alert: nextAvail ? "HQ OPERATOR ONLINE" : "FAILOVER: AUTONOMOUS DISPATCH ACTIVE",
-        };
-      } else if (action === "RESET_NORMAL") {
-        nextState = {
-          ...DEFAULT_STATE,
-          route_name: "Primary Corridor (Route A)",
-          police_available: prev.police_available,
-        };
-      }
+    if (action === "TRIGGER_EMERGENCY") {
+      const isRoutine = severityChoice?.includes("ROUTINE");
+      nextState = {
+        ...state,
+        emergency_active: !isRoutine,
+        severity: severityChoice || "CRITICAL (CODE RED)",
+        police_decision: isRoutine ? "ROUTINE_TRANSFER" : (state.police_available ? "PENDING" : "AUTO_APPROVED"),
+        signals: state.signals.map((s) => ({
+          ...s,
+          status: !isRoutine && !state.police_available ? "GREEN" : (isRoutine ? "RED" : "PREPARING"),
+        })),
+        alert: isRoutine
+          ? "ROUTINE TRANSFER IN PROGRESS - REGULAR SIGNALS"
+          : `EMERGENCY ALERT: ${severityChoice} - CLEARANCE REQUESTED`,
+      };
+    } else if (action === "POLICE_APPROVE") {
+      nextState = {
+        ...state,
+        police_decision: "APPROVED",
+        signals: state.signals.map((s) => ({ ...s, status: "GREEN" })),
+        alert: "POLICE APPROVED: FULL GREEN WAVE CORRIDOR ACTIVE",
+      };
+    } else if (action === "POLICE_REJECT") {
+      nextState = {
+        ...state,
+        police_decision: "REJECTED",
+        signals: state.signals.map((s) => ({ ...s, status: "RED" })),
+        alert: "POLICE OVERRIDE: GREEN CORRIDOR REJECTED",
+      };
+    } else if (action === "TOGGLE_ROAD_BLOCK") {
+      const nextBlocked = !state.road_blocked;
+      nextState = {
+        ...state,
+        road_blocked: nextBlocked,
+        route_name: nextBlocked ? "Alternative Bypass (Route B)" : "Primary Corridor (Route A)",
+        distance_km: nextBlocked ? 3.8 : 2.4,
+        eta_seconds: nextBlocked ? 260 : 180,
+        alert: nextBlocked ? "CONGESTION/BLOCKAGE DETECTED - REROUTING AMBULANCE" : "PRIMARY CORRIDOR CLEARED",
+      };
+    } else if (action === "TOGGLE_OPERATOR") {
+      const nextAvail = !state.police_available;
+      nextState = {
+        ...state,
+        police_available: nextAvail,
+        alert: nextAvail ? "HQ OPERATOR ONLINE" : "FAILOVER: AUTONOMOUS DISPATCH ACTIVE",
+      };
+    } else if (action === "RESET_NORMAL") {
+      nextState = {
+        ...DEFAULT_STATE,
+        route_name: "Primary Corridor (Route A)",
+        police_available: state.police_available,
+      };
+    }
 
-      if (bcRef.current) {
-        bcRef.current.postMessage({ type: "STATE_UPDATE", data: nextState });
-      }
+    setState(nextState);
 
-      return nextState;
-    });
-  }, []);
+    // Broadcast across browser tabs
+    if (bcRef.current) {
+      bcRef.current.postMessage({ type: "STATE_UPDATE", data: nextState });
+    }
+
+    // Sync to Render Backend API
+    try {
+      await fetch(`${BACKEND_URL}/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, severity: severityChoice, state: nextState }),
+      });
+    } catch (e) {
+      console.warn("Backend sync notice:", e);
+    }
+  }, [state]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,7 +216,7 @@ export default function App() {
             Switch to {role === "hq" ? "🚑 Ambulance App" : "🚨 HQ App"}
           </button>
           <span style={{ padding: "6px 12px", borderRadius: "999px", fontSize: "0.75rem", fontWeight: "bold", backgroundColor: connected ? "#064e3b" : "#450a0a", color: connected ? "#34d399" : "#fca5a5" }}>
-            {connected ? "● LIVE SYNCED" : "○ DISCONNECTED"}
+            {connected ? "● LIVE CLOUD SYNC" : "○ DISCONNECTED"}
           </span>
         </div>
       </header>
@@ -200,7 +229,6 @@ export default function App() {
       {/* Ambulance View */}
       {role === "ambulance" ? (
         !isAmbulanceLoggedIn ? (
-          /* Normal Driver Login Form */
           <div style={{ maxWidth: "400px", margin: "40px auto 0 auto", backgroundColor: "#111827", padding: "28px", borderRadius: "10px", border: "1px solid #1e293b" }}>
             <h2 style={{ margin: "0 0 6px 0", fontSize: "1.3rem", color: "#38bdf8", textAlign: "center" }}>
               🚑 Ambulance Driver Login
@@ -260,7 +288,6 @@ export default function App() {
             </form>
           </div>
         ) : (
-          /* Live Ambulance Dashboard */
           <div style={{ marginTop: "20px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", padding: "8px 12px", backgroundColor: "#1e293b", borderRadius: "6px" }}>
               <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
@@ -312,7 +339,7 @@ export default function App() {
           </div>
         )
       ) : (
-        /* HQ Operator View */
+        /* HQ View */
         <div style={{ marginTop: "16px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
             <div style={{ backgroundColor: "#111827", padding: "14px", borderRadius: "8px", border: "1px solid #1e293b" }}>
