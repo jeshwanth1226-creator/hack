@@ -46,7 +46,7 @@ export default function App() {
   const [role, setRole] = useState<"hq" | "ambulance">("hq");
   const bcRef = useRef<BroadcastChannel | null>(null);
 
-  // Normal Ambulance Login State
+  // Ambulance Form Login State
   const [isAmbulanceLoggedIn, setIsAmbulanceLoggedIn] = useState(false);
   const [ambulanceId, setAmbulanceId] = useState("");
   const [driverName, setDriverName] = useState("");
